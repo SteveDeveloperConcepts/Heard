@@ -1,0 +1,57 @@
+appId: com.developerconcepts.stevenola
+productName: SteveNola
+copyright: Copyright © 2026 Steve Vaubell
+directories:
+  buildResources: build
+  output: dist
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!scripts/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.gitignore,README.md}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!electron-builder.yml'
+  - '!native/*'
+asar: true
+# Native speech-recognition runtime (ONNX Runtime, used by the built-in transcription) can't load from inside the asar.
+asarUnpack:
+  - '**/node_modules/onnxruntime-node/**'
+  - '**/node_modules/sharp/**'
+  - '**/node_modules/@img/**'
+publish: null
+
+win:
+  target:
+    - nsis
+  files:
+    - '!**/node_modules/onnxruntime-node/bin/napi-v*/{darwin,linux}/**'
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: SteveNola
+  artifactName: SteveNola-Setup-${version}.${ext}
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+  files:
+    - '!**/node_modules/onnxruntime-node/bin/napi-v*/{win32,linux}/**'
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Call-detection helper, built by `npm run helper:mac`.
+  extraResources:
+    - from: build/mac/call-monitor
+      to: call-monitor
+  # macOS shows these strings in its permission prompts.
+  extendInfo:
+    NSMicrophoneUsageDescription: SteveNola transcribes your side of a meeting, only while you are recording.
+    NSAudioCaptureUsageDescription: SteveNola transcribes the other participants' audio, only while you are recording.
+  notarize: false
+dmg:
+  artifactName: SteveNola-${version}-${arch}.${ext}

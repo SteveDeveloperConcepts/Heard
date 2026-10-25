@@ -1,0 +1,6 @@
+node_modules
+out
+dist
+build/mac
+*.log
+.DS_Store
