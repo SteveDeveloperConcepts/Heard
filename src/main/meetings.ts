@@ -132,12 +132,31 @@ export async function createMeeting(): Promise<Meeting> {
 
 export async function updateMeeting(id: string, patch: MeetingPatch): Promise<Meeting> {
   const meeting = await mustGet(id)
-  if (patch.title !== undefined) meeting.title = String(patch.title).slice(0, 300)
+  if (patch.title !== undefined) {
+    meeting.title = String(patch.title).slice(0, 300)
+    meeting.titleSource = patch.titleSource ?? 'user'
+  }
   if (patch.notes !== undefined) meeting.notes = String(patch.notes)
   if (patch.enhancedNotes !== undefined) meeting.enhancedNotes = patch.enhancedNotes === null ? null : String(patch.enhancedNotes)
   if (patch.enhancedBy !== undefined) meeting.enhancedBy = patch.enhancedBy
+  if (patch.enhancedEdited !== undefined) meeting.enhancedEdited = patch.enhancedEdited
+  if (patch.enhancedSegmentCount !== undefined) meeting.enhancedSegmentCount = patch.enhancedSegmentCount
   if (patch.template !== undefined) meeting.template = patch.template
   return touch(meeting)
+}
+
+/** Marks a meeting whose summary is still to be written. Synchronous, so it's saved even if the app quits right away. */
+export function setSummaryPending(id: string, pending: boolean): void {
+  const meeting = cache.get(id)
+  if (!meeting || Boolean(meeting.summaryPending) === pending) return
+  if (pending) meeting.summaryPending = true
+  else delete meeting.summaryPending
+  scheduleWrite(id)
+}
+
+export async function pendingSummaries(): Promise<string[]> {
+  await loadAll()
+  return [...cache.values()].filter((m) => m.summaryPending).map((m) => m.id)
 }
 
 export async function appendSegment(id: string, segment: TranscriptSegment): Promise<void> {

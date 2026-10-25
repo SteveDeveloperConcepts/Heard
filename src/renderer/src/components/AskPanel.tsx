@@ -71,7 +71,7 @@ export function AskPanel({ meetingId, initialChat, fallbackSubject }: Props) {
         } else if (event.type === 'done') {
           setPending(null)
           setMessages((m) => [...m, { id: event.requestId, role: 'assistant', text: event.text, createdAt: new Date().toISOString() }])
-        } else {
+        } else if (event.type === 'error') {
           setPending(null)
           setError(event.message)
         }

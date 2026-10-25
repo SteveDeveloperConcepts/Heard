@@ -1,8 +1,11 @@
 import { BrowserWindow, Notification } from 'electron'
 import { IPC } from '../../shared/ipc'
 import type { CallEvent, CallInfo } from '../../shared/types'
+import { aiReady } from '../ai'
+import { getMeeting, updateMeeting } from '../meetings'
 import { recorder } from '../recorder'
 import { loadSettings } from '../settings'
+import { CALL_APPS } from './apps'
 import { callDetector } from './detector'
 
 // Turns detected calls into a question for the user. Nothing records until they answer Record,
@@ -40,8 +43,18 @@ export function pendingCall(): CallInfo | null {
   return callDetector.list().find((c) => c.meetingId === null) ?? null
 }
 
-export function linkCall(callId: string, meetingId: string): void {
+/**
+ * Ties a call to the meeting recording it, and names the meeting after the call's app until the AI
+ * gives it a better title. `appName` covers a call that already ended, e.g. Record clicked late on
+ * its notification; only known app names are used.
+ */
+export async function linkCall(callId: string, meetingId: string, appName: string): Promise<void> {
   callDetector.link(callId, meetingId)
+  const name = callDetector.list().find((c) => c.id === callId)?.appName ?? CALL_APPS.find((app) => app.name === appName)?.name
+  const meeting = await getMeeting(meetingId)
+  if (name && meeting && !meeting.title.trim()) {
+    await updateMeeting(meetingId, { title: `${name} call`, titleSource: 'call' })
+  }
 }
 
 /** Starts or stops watching for calls to match the user's setting. */
@@ -66,7 +79,8 @@ export function setupCallDetection(showWindow: () => void): void {
     // On macOS before 14.2 our own recording keeps the mic "in use", so an end can't be trusted.
     if (recordingThisCall && loadSettings().stopWhenCallEnds && callDetector.knowsWhichApp) {
       void recorder.stop()
-      notify(`${call.appName} call ended`, 'Recording stopped. Your notes are ready to enhance.', { onClick: showWindow })
+      const next = loadSettings().autoSummary && aiReady() ? 'The summary will be ready in a moment.' : 'Your notes are ready to enhance.'
+      notify(`${call.appName} call ended`, `Recording stopped. ${next}`, { onClick: showWindow })
     }
   })
 

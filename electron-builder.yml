@@ -26,6 +26,10 @@ win:
   target:
     - target: nsis
       arch: x64
+  # Reports which programs are capturing from a microphone, for call detection.
+  extraResources:
+    - from: native/win/call-monitor.ps1
+      to: call-monitor.ps1
 nsis:
   oneClick: false
   perMachine: false

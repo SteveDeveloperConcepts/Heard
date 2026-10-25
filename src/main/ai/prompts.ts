@@ -24,7 +24,8 @@ One ### section per major topic, with bullets.
 ## Decisions
 ## Action items — "- [ ] Owner: task (due date if one was mentioned)"
 ## Open questions`,
-  'one-on-one': `## Check-in — how each person is doing, briefly.
+  'one-on-one': `## Summary — two or three sentences: what you talked about and where it landed.
+## Check-in — how each person is doing, briefly.
 ## Topics — one ### section per topic, with bullets.
 ## Feedback — given or received, attributed.
 ## Growth & goals
@@ -35,17 +36,51 @@ One ### section per major topic, with bullets.
 ## Questions & objections — with how each was answered.
 ## Commitments — what we promised, what they promised.
 ## Next steps — "- [ ] Owner: task (due date if one was mentioned)"`,
-  standup: `One ### section per person who gave an update, each with:
+  standup: `## Summary — one or two sentences: overall progress, and anything that's stuck.
+One ### section per person who gave an update, each with:
 - **Done:** …
 - **Next:** …
 - **Blockers:** … (omit if none)
 ## Blockers needing follow-up — "- [ ] Owner: what needs to happen"`,
-  interview: `## Candidate — name, role interviewed for, background in two or three bullets.
+  interview: `## Summary — two or three sentences: who was interviewed, for what, and what was covered.
+## Candidate — name, role interviewed for, background in two or three bullets.
 ## Topics covered — one ### section per question area, with the substance of the answers.
 ## Strengths — each tied to something specific they said.
 ## Concerns — each tied to something specific they said.
 ## Follow-ups — what to probe in later rounds.
 Report evidence only; don't make a hire / no-hire recommendation.`
+}
+
+// Asked as a follow-up to the notes, so the model names the meeting from what it just wrote.
+export const TITLE_INSTRUCTION = `Now give this meeting a title for the user's list of meetings: three to seven words on what it was about, naming the company, team or person when that's what sets it apart. Write it in the language the meeting was held in. Reply with the title alone, with no quotes, date or closing punctuation.`
+
+const MAX_TITLE_LENGTH = 80
+const MAX_TITLE_WORDS = 12
+
+/**
+ * The title from the model's reply, without what models sometimes add: a <think> block, a preamble
+ * ("Here's a title:"), a label, a list marker, quotes or Markdown. A reply that still doesn't look
+ * like a title gives '', and the meeting keeps its name.
+ */
+export function cleanTitle(reply: string): string {
+  const lines = reply
+    .replace(/<think>[\s\S]*?(<\/think>|$)/gi, '')
+    .split('\n')
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^#+\s*/, '')
+        .replace(/^(?:[-*•]|\d+[.)])\s+/, '')
+        .replace(/^.*?\btitle(?: is)?\s*:\s*/i, '')
+        .replace(/^["'“‘*_`\s]+|["'”’*_`.\s]+$/g, '')
+        .replace(/\s+/g, ' ')
+    )
+    // A line that's empty once cleaned was only a label ("**Title:**"); one ending in ':' introduces the title.
+    .filter((line) => line && !line.endsWith(':'))
+  const title = lines[0] ?? ''
+  if (!title || title.split(' ').length > MAX_TITLE_WORDS) return ''
+  if (title.length <= MAX_TITLE_LENGTH) return title
+  return `${title.slice(0, MAX_TITLE_LENGTH).replace(/\s+\S*$/, '')}…`
 }
 
 export function enhanceInstruction(template: TemplateId): string {

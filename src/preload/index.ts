@@ -34,6 +34,7 @@ const api: SteveNolaApi = {
     enhance: (meetingId) => ipcRenderer.invoke(IPC.aiEnhance, meetingId),
     ask: (meetingId, question) => ipcRenderer.invoke(IPC.aiAsk, meetingId, question),
     cancel: (requestId) => ipcRenderer.send(IPC.aiCancel, requestId),
+    progress: (meetingId) => ipcRenderer.invoke(IPC.aiProgress, meetingId),
     onEvent: (cb) => subscribe(IPC.aiEvent, cb),
     listModels: (request) => ipcRenderer.invoke(IPC.aiListModels, request)
   },
@@ -48,7 +49,7 @@ const api: SteveNolaApi = {
   },
   calls: {
     current: () => ipcRenderer.invoke(IPC.callsCurrent),
-    link: (callId, meetingId) => ipcRenderer.invoke(IPC.callsLink, callId, meetingId),
+    link: (callId, meetingId, appName) => ipcRenderer.invoke(IPC.callsLink, callId, meetingId, appName),
     onEvent: (cb) => subscribe(IPC.callsEvent, cb)
   },
   share: {

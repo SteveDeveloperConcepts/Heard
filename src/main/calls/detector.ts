@@ -5,9 +5,12 @@ import type { CallInfo } from '../../shared/types'
 import { appForBundleId, appForWindowsEntry, isBrowserBundleId, isBrowserWindowsEntry, type CallApp } from './apps'
 import { startMacMonitor, type MacMicReport } from './mac'
 import { webCallOnScreen } from './windowTitles'
-import { activeMicEntries } from './windows'
+import { activeMicEntries, entryNamesForPath, startWindowsMonitor } from './windows'
 
 const POLL_MS = 3000
+// The Windows monitor is started again this many times if it quits, this long after.
+const MONITOR_RESTARTS = 3
+const MONITOR_RESTART_MS = 10_000
 // A call app can drop the mic for a moment (device switch, mute in some apps); only call it ended
 // after it has been off the mic this long.
 const END_GRACE_MS = 6000
@@ -19,6 +22,10 @@ interface DetectorEvents {
 
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined
+}
+
+function exeName(path: string): string {
+  return path.slice(path.lastIndexOf('\\') + 1).toLowerCase()
 }
 
 /**
@@ -37,6 +44,10 @@ class CallDetector extends EventEmitter<DetectorEvents> {
   private appsOnMic: CallApp[] = []
   private browserOnMic = false
   private browserLastOnMic = 0
+  /** Windows: entries of the registry's mic usage record that are in use. */
+  private registryEntries: string[] = []
+  /** Windows: for each process capturing from a mic, its exe path and its parents'. */
+  private sessionChains: string[][] = []
   /** The web call seen in a window title since a browser took the mic. */
   private webCall: CallApp | null = null
   private checking = false
@@ -54,11 +65,12 @@ class CallDetector extends EventEmitter<DetectorEvents> {
     if (this.running) return
     this.webCall = null // a title read still in flight from before stop() may have set it
     if (process.platform === 'win32') {
+      // Core Audio's capture sessions say which programs are on the mic. Windows' usage record in
+      // the registry is read too, as a fallback, though some Windows builds stopped updating it.
+      this.startWindowsMonitor(MONITOR_RESTARTS)
       const poll = async () => {
-        const entries = await activeMicEntries()
-        this.appsOnMic = entries.map(appForWindowsEntry).filter(isDefined)
-        this.browserOnMic = entries.some(isBrowserWindowsEntry)
-        await this.check()
+        this.registryEntries = await activeMicEntries()
+        this.onWindowsReport()
       }
       void poll()
       this.timer = setInterval(() => void poll(), POLL_MS)
@@ -79,6 +91,64 @@ class CallDetector extends EventEmitter<DetectorEvents> {
     this.appsOnMic = []
     this.browserOnMic = false
     this.webCall = null
+    this.registryEntries = []
+    this.sessionChains = []
+  }
+
+  /** Runs the Core Audio monitor, starting it again if it quits while detection is on. */
+  private startWindowsMonitor(restartsLeft: number): void {
+    const helper = startWindowsMonitor(
+      (report) => {
+        if (this.helper !== helper) return
+        this.sessionChains = report.sessions
+        this.onWindowsReport()
+      },
+      () => {
+        if (this.helper !== helper) return // stopped on purpose
+        this.helper = null
+        this.sessionChains = []
+        this.onWindowsReport()
+        if (restartsLeft > 0) {
+          setTimeout(() => {
+            if (this.timer && !this.helper) this.startWindowsMonitor(restartsLeft - 1)
+          }, MONITOR_RESTART_MS)
+        }
+      }
+    )
+    this.helper = helper
+  }
+
+  /** Works out the call apps and browsers on the mic from both Windows sources. */
+  private onWindowsReport(): void {
+    const apps = new Map<string, CallApp>()
+    let browser = false
+    for (const entry of this.registryEntries) {
+      const app = appForWindowsEntry(entry)
+      if (app) apps.set(app.id, app)
+      else if (isBrowserWindowsEntry(entry)) browser = true
+    }
+    for (const chain of this.sessionChains) {
+      for (const [i, path] of chain.entries()) {
+        const names = entryNamesForPath(path)
+        const app = names.map(appForWindowsEntry).find(isDefined)
+        if (app) {
+          apps.set(app.id, app)
+          break
+        }
+        if (names.some(isBrowserWindowsEntry)) {
+          browser = true
+          break
+        }
+        // Only a helper speaks for its parent: WebView2 (WhatsApp and the new Teams capture in one)
+        // or another process of the same exe, as Electron and Chromium apps run. Anything else, like
+        // Word opened from a Teams chat, is judged on its own.
+        const parent = chain[i + 1]
+        if (!parent || !(exeName(path) === 'msedgewebview2.exe' || exeName(path) === exeName(parent))) break
+      }
+    }
+    this.appsOnMic = [...apps.values()]
+    this.browserOnMic = browser
+    void this.check()
   }
 
   list(): CallInfo[] {

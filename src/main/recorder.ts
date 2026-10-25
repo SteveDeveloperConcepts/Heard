@@ -21,11 +21,20 @@ interface Session {
   language: string
   streams: Map<AudioSource, LiveTranscriber>
   reconnects: Map<AudioSource, number>
+  /** Streams of sources that already ended, still transcribing their last audio. */
+  endedSources: Promise<void>[]
+  /** False when capture never started, e.g. the microphone was blocked. */
+  receivedAudio: boolean
 }
 
 interface RecorderEvents {
   state: [RecordingState]
   transcript: [TranscriptEvent]
+  /**
+   * A recording ended and its transcript is complete. `summarize` is false when quitting, deleting,
+   * or when no audio ever arrived.
+   */
+  finished: [meetingId: string, summarize: boolean]
 }
 
 /**
@@ -34,6 +43,8 @@ interface RecorderEvents {
  */
 class Recorder extends EventEmitter<RecorderEvents> {
   private session: Session | null = null
+  /** Stopped recordings still transcribing their last audio. */
+  private readonly finishing = new Set<Promise<void>>()
 
   state(): RecordingState {
     const s = this.session
@@ -76,7 +87,9 @@ class Recorder extends EventEmitter<RecorderEvents> {
       apiKey,
       language: settings.language,
       streams: new Map(),
-      reconnects: new Map()
+      reconnects: new Map(),
+      endedSources: [],
+      receivedAudio: false
     }
     this.session = session
     const sources: AudioSource[] = settings.captureSystemAudio ? ['mic', 'system'] : ['mic']
@@ -128,7 +141,11 @@ class Recorder extends EventEmitter<RecorderEvents> {
   }
 
   push(source: AudioSource, pcm: ArrayBuffer): void {
-    this.session?.streams.get(source)?.send(Buffer.from(pcm))
+    const session = this.session
+    const stream = session?.streams.get(source)
+    if (!session || !stream) return
+    session.receivedAudio = true
+    stream.send(Buffer.from(pcm))
   }
 
   /** Stops transcribing one source; stops the whole recording if none are left. */
@@ -137,22 +154,43 @@ class Recorder extends EventEmitter<RecorderEvents> {
     const stream = session?.streams.get(source)
     if (!session || !stream) return
     session.streams.delete(source)
-    void stream.finish()
+    session.endedSources.push(stream.finish())
     if (session.streams.size === 0) void this.stop()
     else this.emit('state', this.state())
   }
 
-  async stop(): Promise<RecordingState> {
+  /** True while a stopped recording is still transcribing its last audio. */
+  isFinishing(): boolean {
+    return this.finishing.size > 0
+  }
+
+  /** Resolves once every stopped recording has its transcript complete. */
+  async whenFinished(): Promise<void> {
+    await Promise.allSettled([...this.finishing])
+  }
+
+  async stop({ summarize = true }: { summarize?: boolean } = {}): Promise<RecordingState> {
     const session = this.session
     if (!session) return this.state()
     // Disarm first so no new capture can start while the streams flush.
     this.session = null
     setCaptureArmed(false)
+    const finishing = this.finish(session, summarize)
+    this.finishing.add(finishing)
+    try {
+      await finishing
+    } finally {
+      this.finishing.delete(finishing)
+    }
+    return this.state()
+  }
+
+  private async finish(session: Session, summarize: boolean): Promise<void> {
     await addRecordedTime(session.meetingId, Date.now() - session.startedAt)
     this.emit('state', this.state())
     // Results for audio already sent keep arriving until each stream closes; they are still saved.
-    await Promise.all([...session.streams.values()].map((stream) => stream.finish()))
-    return this.state()
+    await Promise.allSettled([...session.endedSources, ...[...session.streams.values()].map((stream) => stream.finish())])
+    this.emit('finished', session.meetingId, summarize && session.receivedAudio)
   }
 }
 

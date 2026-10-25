@@ -19,6 +19,7 @@ export const IPC = {
   aiEnhance: 'ai:enhance',
   aiAsk: 'ai:ask',
   aiCancel: 'ai:cancel',
+  aiProgress: 'ai:progress',
   aiEvent: 'ai:event',
   aiListModels: 'ai:list-models',
 

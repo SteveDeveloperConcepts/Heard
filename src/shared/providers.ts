@@ -1,4 +1,4 @@
-import type { AiProviderId } from './types'
+import type { AiProviderId, Settings } from './types'
 
 export interface AiProviderInfo {
   label: string
@@ -87,6 +87,15 @@ export const AI_PROVIDERS: Record<AiProviderId, AiProviderInfo> = {
     suggestedModels: [],
     note: 'Any service with an OpenAI-style /chat/completions endpoint, such as LM Studio, Groq, Mistral, DeepSeek or a self-hosted vLLM server.'
   }
+}
+
+/** What still needs setting up before the AI can write notes, or null. Matches the main process's aiReady(). */
+export function aiSetupProblem(s: Settings): string | null {
+  const info = AI_PROVIDERS[s.aiProvider]
+  if (info.keyRequired && s.aiKeys[s.aiProvider] === 'none') return `Add a ${info.label} API key to get summaries and notes.`
+  if (!s.aiModels[s.aiProvider]) return `Choose a ${info.label} model to get summaries and notes.`
+  if (s.aiProvider !== 'anthropic' && !s.aiBaseUrls[s.aiProvider]) return `Set the ${info.label} API base URL to get summaries and notes.`
+  return null
 }
 
 export function isAiProviderId(value: unknown): value is AiProviderId {

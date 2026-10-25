@@ -163,6 +163,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
   const [aiKeys, setAiKeys] = useState<Partial<Record<AiProviderId, string>>>({})
   const [aiModels, setAiModels] = useState(settings.aiModels)
   const [aiBaseUrls, setAiBaseUrls] = useState(settings.aiBaseUrls)
+  const [autoSummary, setAutoSummary] = useState(settings.autoSummary)
   const [modelOptions, setModelOptions] = useState<Partial<Record<AiProviderId, string[]>>>({})
   // Providers where the user chose "Other model id…" to type an id that isn't in the list.
   const [typingModel, setTypingModel] = useState<Partial<Record<AiProviderId, boolean>>>({})
@@ -266,6 +267,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
         aiProvider: provider,
         aiModels,
         aiBaseUrls,
+        autoSummary,
         language,
         captureSystemAudio,
         micDeviceId,
@@ -432,6 +434,16 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                     )}
                   </div>
                 </div>
+                <label className="checkbox">
+                  <input type="checkbox" checked={autoSummary} onChange={(e) => setAutoSummary(e.target.checked)} />
+                  <span>
+                    Write a summary and title when a recording stops
+                    <span className="hint">
+                      Your notes are ready by the time you look, opening with a summary. Meetings you've already named keep
+                      their title, and notes you've edited by hand are never replaced.
+                    </span>
+                  </span>
+                </label>
               </section>
             )}
 

@@ -22,9 +22,14 @@ export interface ChatMessage {
 
 export type TemplateId = 'general' | 'one-on-one' | 'customer-call' | 'standup' | 'interview'
 
+/** Who chose a meeting's title. The AI only names meetings that are untitled or named after a detected call. */
+export type TitleSource = 'user' | 'call' | 'ai'
+
 export interface Meeting {
   id: string
   title: string
+  /** Missing on meetings saved before titles were tracked; treated as the user's. */
+  titleSource?: TitleSource
   createdAt: string
   updatedAt: string
   /** Total recorded time across every recording session of this meeting. */
@@ -35,6 +40,12 @@ export interface Meeting {
   enhancedNotes: string | null
   /** The model that wrote `enhancedNotes`. */
   enhancedBy?: string | null
+  /** The user changed `enhancedNotes` by hand, so they're never replaced automatically. */
+  enhancedEdited?: boolean
+  /** How many transcript segments `enhancedNotes` were written from. */
+  enhancedSegmentCount?: number
+  /** A recording ended and its summary isn't written yet; picked up again if the app quit first. */
+  summaryPending?: boolean
   template: TemplateId
   transcript: TranscriptSegment[]
   chat: ChatMessage[]
@@ -50,7 +61,12 @@ export interface MeetingSummary {
   preview: string
 }
 
-export type MeetingPatch = Partial<Pick<Meeting, 'title' | 'notes' | 'enhancedNotes' | 'enhancedBy' | 'template'>>
+export type MeetingPatch = Partial<
+  Pick<
+    Meeting,
+    'title' | 'titleSource' | 'notes' | 'enhancedNotes' | 'enhancedBy' | 'enhancedEdited' | 'enhancedSegmentCount' | 'template'
+  >
+>
 
 export type MacAudioBackend = 'screencapturekit' | 'coreaudio-tap'
 
@@ -67,6 +83,8 @@ export interface Settings {
   aiKeys: Record<AiProviderId, KeyStatus>
   aiModels: Record<AiProviderId, string>
   aiBaseUrls: Record<AiProviderId, string>
+  /** When a recording stops, write the notes (with a summary) and name an untitled meeting. */
+  autoSummary: boolean
   language: string
   captureSystemAudio: boolean
   micDeviceId: string | null
@@ -100,6 +118,7 @@ export interface SettingsUpdate {
   aiModels?: Partial<Record<AiProviderId, string>>
   /** Only honored for providers whose base URL is editable (Ollama, custom). */
   aiBaseUrls?: Partial<Record<AiProviderId, string>>
+  autoSummary?: boolean
   language?: string
   captureSystemAudio?: boolean
   micDeviceId?: string | null
@@ -181,12 +200,20 @@ export type TranscriptEvent =
   | { kind: 'interim'; meetingId: string; source: AudioSource; text: string }
   | { kind: 'error'; meetingId: string; source: AudioSource; message: string }
 
-export type AiTask = 'enhance' | 'ask'
+export type AiTask = 'enhance' | 'ask' | 'title'
 
 export type AiEvent =
+  /** A request began, whoever started it (the user, or a recording that just stopped). */
+  | { requestId: string; meetingId: string; task: AiTask; type: 'start' }
   | { requestId: string; meetingId: string; task: AiTask; type: 'delta'; text: string }
   | { requestId: string; meetingId: string; task: AiTask; type: 'done'; text: string }
   | { requestId: string; meetingId: string; task: AiTask; type: 'error'; message: string }
+
+/** Enhanced notes being written right now, so a view opened mid-way can show them. */
+export interface AiProgress {
+  requestId: string
+  text: string
+}
 
 export type MediaAccess = 'not-determined' | 'granted' | 'denied' | 'restricted' | 'unknown'
 

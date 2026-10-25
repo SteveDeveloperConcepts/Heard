@@ -1,5 +1,6 @@
 import type {
   AiEvent,
+  AiProgress,
   AudioSource,
   CallEvent,
   CallInfo,
@@ -48,6 +49,8 @@ export interface SteveNolaApi {
     enhance(meetingId: string): Promise<string>
     ask(meetingId: string, question: string): Promise<string>
     cancel(requestId: string): void
+    /** Enhanced notes being written for this meeting right now, if any. */
+    progress(meetingId: string): Promise<AiProgress | null>
     onEvent(cb: (event: AiEvent) => void): Unsubscribe
     listModels(request: ModelListRequest): Promise<string[]>
   }
@@ -63,8 +66,11 @@ export interface SteveNolaApi {
   calls: {
     /** A detected call still waiting for the user's answer, if any. */
     current(): Promise<CallInfo | null>
-    /** Ties a call to the meeting recording it, so the recording can stop when the call ends. */
-    link(callId: string, meetingId: string): Promise<void>
+    /**
+     * Ties a call to the meeting recording it, so the recording can stop when the call ends, and
+     * names an untitled meeting after the call's app.
+     */
+    link(callId: string, meetingId: string, appName: string): Promise<void>
     onEvent(cb: (event: CallEvent) => void): Unsubscribe
   }
   share: {

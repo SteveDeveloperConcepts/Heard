@@ -37,5 +37,8 @@ export function useAutosave(meetingId: string, onSaved: () => void) {
 
   useEffect(() => () => void flush(), [flush])
 
-  return { queue, flush }
+  /** Whether an edit to this field is waiting to be saved. */
+  const isPending = useCallback((field: keyof MeetingPatch) => field in pending.current, [])
+
+  return { queue, flush, isPending }
 }

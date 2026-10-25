@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { defaultSubject, markdownToPlainText } from '../../../shared/email'
+import { aiSetupProblem } from '../../../shared/providers'
 import type { AudioSource, Meeting, Settings, TemplateId } from '../../../shared/types'
 import { transcriptToText } from '../../../shared/transcript'
 import { useAutosave } from '../hooks/useAutosave'
@@ -45,7 +46,9 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
   const [aiError, setAiError] = useState<string | null>(null)
   const [emailOpen, setEmailOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const { queue, flush } = useAutosave(meetingId, onChanged)
+  const { queue, flush, isPending } = useAutosave(meetingId, onChanged)
+  // The enhance request on screen; events from one it replaced are ignored.
+  const runRef = useRef<string | null>(null)
 
   // Renaming this meeting in the sidebar updates the title here. Queuing it also replaces any
   // title edit that hasn't been saved yet, so the old title can't overwrite the new one.
@@ -65,7 +68,14 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
       setMeeting(m)
       setTitle(m.title)
       setNotes(m.notes)
-      setTab(m.enhancedNotes ? 'enhanced' : 'notes')
+      if (m.enhancedNotes || runRef.current) setTab('enhanced')
+    })
+    // Notes may already be on their way, e.g. a summary started when the recording stopped.
+    void window.api.ai.progress(meetingId).then((progress) => {
+      if (cancelled || !progress) return
+      runRef.current = progress.requestId
+      setEnhancing(progress)
+      setTab('enhanced')
     })
     return () => {
       cancelled = true
@@ -90,29 +100,59 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
   useEffect(
     () =>
       window.api.ai.onEvent((event) => {
-        if (event.meetingId !== meetingId || event.task !== 'enhance') return
+        if (event.meetingId !== meetingId) return
+        if (event.task === 'title') {
+          // The AI named the meeting. Show what's saved, read after any title save of the user's
+          // still on its way; a title they're typing wins.
+          if (event.type === 'done' && !isPending('title')) {
+            void window.api.meetings.get(meetingId).then((fresh) => {
+              if (fresh && !isPending('title')) setTitle(fresh.title)
+            })
+          }
+          return
+        }
+        if (event.task !== 'enhance') return
+        if (event.type === 'start') {
+          runRef.current = event.requestId
+          setEnhancing({ requestId: event.requestId, text: '' })
+          setAiError(null)
+          // Close the notes editor so the new notes show. Edits not yet saved are saved as the user's,
+          // so a summary written meanwhile keeps them.
+          if (isPending('enhancedNotes')) void flush()
+          setEditingEnhanced(false)
+          // Show the notes as they're written, unless the user is typing their own.
+          if (!document.activeElement?.matches('.notes-editor')) setTab('enhanced')
+          return
+        }
+        if (event.type === 'done') {
+          // The main process saved the notes and the model; reload to pick up both, after any edit
+          // still waiting to be saved, so the screen matches what's stored.
+          void flush()
+            .then(() => window.api.meetings.get(meetingId))
+            .then((fresh) => {
+              if (fresh) setMeeting((m) => (m ? { ...m, enhancedNotes: fresh.enhancedNotes, enhancedBy: fresh.enhancedBy } : m))
+            })
+          onChanged()
+        }
+        if (event.requestId !== runRef.current) return
         if (event.type === 'delta') {
           setEnhancing((s) => ({ requestId: event.requestId, text: (s?.text ?? '') + event.text }))
-        } else if (event.type === 'done') {
-          setEnhancing(null)
-          // The main process saved the notes and the model; reload to pick up both.
-          void window.api.meetings.get(meetingId).then((fresh) => {
-            if (fresh) setMeeting((m) => (m ? { ...m, enhancedNotes: fresh.enhancedNotes, enhancedBy: fresh.enhancedBy } : m))
-          })
-          onChanged()
         } else {
+          runRef.current = null
           setEnhancing(null)
-          setAiError(event.message)
+          if (event.type === 'error') setAiError(event.message)
         }
       }),
-    [meetingId, onChanged]
+    [meetingId, onChanged, isPending, flush]
   )
 
-  // When recording here stops, clear half-heard text and pick up the saved duration.
+  // When recording here stops, save what was typed (the summary reads it), clear half-heard text
+  // and pick up the saved duration.
   const liveHere = recording.state.active && recording.state.meetingId === meetingId
   const wasLive = useRef(liveHere)
   useEffect(() => {
     if (wasLive.current && !liveHere) {
+      void flush()
       setInterim({})
       void window.api.meetings.get(meetingId).then((fresh) => {
         if (fresh) setMeeting((m) => (m ? { ...m, recordedMs: fresh.recordedMs } : m))
@@ -120,7 +160,7 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
       onChanged()
     }
     wasLive.current = liveHere
-  }, [liveHere, meetingId, onChanged])
+  }, [liveHere, meetingId, onChanged, flush])
 
   useEffect(() => {
     if (!toast) return
@@ -144,6 +184,9 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
   }
 
   if (!meeting) return <div className="meeting" />
+
+  // A summary appears here by itself only if one will be written when the recording stops.
+  const summaryOnStop = settings?.autoSummary && !aiSetupProblem(settings) && (liveHere || meeting.recordedMs === 0)
 
   // Sharing uses what's on screen, including edits the autosave hasn't flushed yet.
   const current: Meeting = { ...meeting, title, notes }
@@ -285,8 +328,17 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
             <p className="panel-empty">Writing your notes…</p>
           ) : (
             <div className="panel-empty">
-              Enhanced notes combine what you typed with the transcript. Choose a structure above, then click{' '}
-              <strong>Enhance notes</strong>.
+              {summaryOnStop ? (
+                <>
+                  When you stop recording, a summary and full notes appear here, written from what you typed and the transcript. To
+                  write them now, click <strong>Enhance notes</strong>.
+                </>
+              ) : (
+                <>
+                  Enhanced notes combine what you typed with the transcript. Choose a structure above, then click{' '}
+                  <strong>Enhance notes</strong>.
+                </>
+              )}
             </div>
           )}
         </div>

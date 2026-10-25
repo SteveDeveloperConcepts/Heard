@@ -1,9 +1,13 @@
-import { execFile } from 'node:child_process'
+import { app } from 'electron'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 
 // Windows records microphone use per app under this key (it drives the "in use" indicator in the
 // taskbar). An app is using the mic right now when its LastUsedTimeStop is 0 and its
-// LastUsedTimeStart isn't. Reading it needs no permission and never touches audio.
+// LastUsedTimeStart isn't. Reading it needs no permission and never touches audio. Some Windows
+// builds stopped updating it, so it's only a fallback for the Core Audio monitor below.
 const MIC_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone'
 
 /** Names (last key segment) of the entries currently using the microphone, from `reg query /s` output. */
@@ -41,4 +45,61 @@ export function activeMicEntries(): Promise<string[]> {
       resolve(err ? [] : parseActiveMicEntries(stdout))
     })
   })
+}
+
+/**
+ * Core Audio's view (see native/win/call-monitor.ps1): for each process capturing from a microphone,
+ * its exe path followed by its parents' (SteveNola itself is left out).
+ */
+export interface WindowsMicReport {
+  sessions: string[][]
+}
+
+function monitorScriptPath(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'call-monitor.ps1') : join(app.getAppPath(), 'native', 'win', 'call-monitor.ps1')
+}
+
+/**
+ * Starts the script that reports which processes capture from a microphone. It prints a report
+ * whenever that changes, and quits by itself if SteveNola does. Returns null when it can't start.
+ */
+export function startWindowsMonitor(onReport: (report: WindowsMicReport) => void, onExit: () => void): ChildProcess | null {
+  const script = monitorScriptPath()
+  if (!existsSync(script)) {
+    console.warn(`Call detection falls back to the registry: ${script} is missing.`)
+    return null
+  }
+  const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  // Run as a script block read from the file: an execution policy set by Group Policy blocks
+  // unsigned script files, but not script blocks. The path goes in an environment variable, so
+  // no quoting can break it.
+  const command = `& ([scriptblock]::Create([IO.File]::ReadAllText($env:STEVENOLA_CALL_MONITOR))) -OwnerPid ${process.pid}`
+  const child = spawn(powershell, ['-NoProfile', '-NonInteractive', '-MTA', '-Command', command], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+    env: { ...process.env, STEVENOLA_CALL_MONITOR: script }
+  })
+  createInterface({ input: child.stdout! }).on('line', (line) => {
+    try {
+      onReport(JSON.parse(line) as WindowsMicReport)
+    } catch {
+      // Ignore anything that isn't a report.
+    }
+  })
+  createInterface({ input: child.stderr! }).on('line', (line) => console.warn('Call monitor:', line))
+  child.on('error', (err) => console.error('Call monitor failed:', err))
+  child.on('exit', onExit)
+  return child
+}
+
+/**
+ * The names an exe path can have under the registry key above, so the same app patterns match:
+ * the path with "#" for "\", and for a Microsoft Store app its package family name.
+ */
+export function entryNamesForPath(path: string): string[] {
+  const names = [path.replace(/\\/g, '#')]
+  // Store apps live in WindowsApps\<name>_<version>_<arch>_<resource>_<publisher id>\.
+  const store = /\\WindowsApps\\([^\\_]+)_[^\\]*_([^\\_]+)\\/i.exec(path)
+  if (store) names.push(`${store[1]}_${store[2]}`)
+  return names
 }

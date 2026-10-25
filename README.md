@@ -1,6 +1,6 @@
 # SteveNola
 
-AI meeting notes for macOS and Windows. Hit record, jot quick notes, and SteveNola transcribes your mic and the call audio live, on your own computer, with no transcription account needed. Afterwards your chosen AI turns your notes plus the transcript into clean meeting notes. You can also ask questions about any meeting.
+AI meeting notes for macOS and Windows. Hit record, jot quick notes, and SteveNola transcribes your mic and the call audio live, on your own computer, with no transcription account needed. When you stop recording, your chosen AI turns your notes plus the transcript into clean meeting notes that open with a summary, and gives the meeting a title. You can also ask questions about any meeting.
 
 ## Install and run
 
@@ -45,7 +45,7 @@ The window opens after a few seconds, and code changes reload automatically. Clo
 
 ### First launch
 
-1. **Pick your AI.** In Settings → AI for notes and questions, choose a provider and paste its API key (Claude is the default). Choose Ollama to run without a key. Recording and transcripts work without an AI; only Enhance and Ask need one.
+1. **Pick your AI.** In Settings → AI for notes and questions, choose a provider and paste its API key (Claude is the default). Choose Ollama to run without a key. Recording and transcripts work without an AI; only the summary, Enhance and Ask need one.
 2. **Record.** Click **Start recording**. The first time, SteveNola downloads the speech model (about 130 MB) and shows progress in the recording bar. To download it in advance, use Settings → Transcription → **Download now**.
 3. **Allow access.** Allow microphone access when asked. On a Mac, also allow **Screen & System Audio Recording**, so the other side of a call is captured (see [Permissions](#permissions)).
 4. **Gmail (optional).** If you're signed in to several Google accounts, pick the one to send from in Settings → Sharing.
@@ -98,7 +98,8 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 - **Two separate audio streams.** Your microphone and the system audio (everyone else on the call) are captured and transcribed separately, so the transcript knows "Me" from "Them". System audio is also diarized, so several remote voices show up as Speaker 1, 2, and so on.
 - **Listens only while recording.** The main process refuses every microphone and system-audio request unless a recording is armed ([src/main/media.ts](src/main/media.ts)). Stopping releases the devices, closes the transcription streams and disarms capture. While recording, the tray icon is a red dot (a hollow ring otherwise). Closing the window mid-meeting keeps recording, and a notification tells you so.
 - **System audio without drivers.** Windows uses WASAPI loopback through Chromium. macOS 13+ uses ScreenCaptureKit (or a Core Audio tap on 14.2+), turned on with Chromium feature switches. In both cases the app asks for display media, keeps the audio track and throws the video away.
-- **Your notes drive the AI notes.** Enhance sends your typed notes, the transcript and a structure template (General, 1:1, Customer call, Standup, Interview) to the AI. Prompts are in [src/main/ai/prompts.ts](src/main/ai/prompts.ts).
+- **Your notes drive the AI notes.** Enhance sends your typed notes, the transcript and a structure template (General, 1:1, Customer call, Standup, Interview) to the AI. Every structure opens with a short summary. Prompts are in [src/main/ai/prompts.ts](src/main/ai/prompts.ts).
+- **A summary and title when the meeting ends.** When a recording stops (the Stop button, the tray, or the call ending), SteveNola writes the notes in the background, even with the window closed, and they stream into the Enhanced tab. It then asks the AI for a short title, used only if the meeting is untitled, still named after its call ("WhatsApp call"), or was named by the AI earlier. It skips recordings with only a few words, and if you record more later it rewrites the notes and title to cover the whole meeting. Notes you've edited by hand are never replaced, and a title you've typed is never changed. If SteveNola quits before the summary is written, it finishes it the next time it starts. Turn it off in Settings → AI ([src/main/ai/index.ts](src/main/ai/index.ts)).
 - **Local storage.** Meetings are JSON files in the app's data folder (Settings → Privacy → Open data folder). Audio is never written to disk. API keys are saved as soon as you paste them and encrypted with Electron's `safeStorage`: Windows data protection (DPAPI, tied to your Windows account) or the macOS Keychain. They're never stored as plain text, shown again, or sent anywhere except to that provider.
 
 ## Share notes by email (Gmail)
@@ -113,13 +114,13 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 
 ## Call detection
 
-When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, or a Google Meet, Teams, Zoom or Webex call starts in your browser, SteveNola shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches).
+When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, or a Google Meet, Teams, Zoom or Webex call starts in your browser, SteveNola shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches), and the summary and a better title are written.
 
 SteveNola has to be running to notice calls. Closing the window leaves it in the tray (the menu bar on a Mac), and the installed app can start there when you log in (Settings → Calls).
 
 Detection reads which apps are using the mic, never audio ([src/main/calls/](src/main/calls)):
 
-- **Windows:** the per-app microphone usage that Windows keeps in the registry (the same data behind the taskbar's "microphone in use" icon), checked every 3 seconds. Works for the Microsoft Store WhatsApp app and desktop apps alike.
+- **Windows:** a small PowerShell script ([native/win/call-monitor.ps1](native/win/call-monitor.ps1)) reads Core Audio's list of audio sessions, the same list the volume mixer shows, every 1.5 seconds, and reports which programs are capturing from a microphone. WhatsApp and the new Teams capture in a WebView2 helper process, so the script also reports each program's parent processes. As a fallback SteveNola also reads the per-app microphone usage that Windows keeps in the registry, which some Windows 11 builds stopped updating. Works for Microsoft Store apps and desktop apps alike.
 - **macOS:** a small Swift helper ([native/mac/call-monitor.swift](native/mac/call-monitor.swift)) reads Core Audio's per-process input state (macOS 14.2+). On macOS 13–14.1 it can only tell that *some* app is using the mic, so it assumes a running call app is the one. In that mode the recording can't stop itself when the call ends, and browser calls aren't detected. `npm run dist:mac` builds the helper; for `npm run dev` on a Mac, run `npm run helper:mac` once first.
 - **Browser calls:** a browser using the mic could be doing anything, so SteveNola then checks the titles of open windows. A browser window's title is its current tab ("Meet - abc-defg-hij - Google Chrome"). Titles are only read while a browser holds the mic, only checked for a call, and never saved or sent anywhere. Once found, the call lasts until the browser lets go of the mic, so switching tabs doesn't end it. The Meet tab must be the visible tab of a window that isn't minimized when the call starts, or when you switch back to it. A Meet window's title is unique, so Meet is also found in the installed Meet app and on a Mac. Teams, Zoom and Webex windows look the same as their desktop apps', so those web calls are only recognised in a Windows browser window. On a Mac, reading window titles needs the Screen & System Audio Recording permission.
 

@@ -23,6 +23,7 @@ interface StoredSettings {
   aiProvider: AiProviderId
   aiModels: Partial<Record<AiProviderId, string>>
   aiBaseUrls: Partial<Record<AiProviderId, string>>
+  autoSummary: boolean
   language: string
   captureSystemAudio: boolean
   micDeviceId: string | null
@@ -50,6 +51,7 @@ const DEFAULTS: StoredSettings = {
   aiProvider: 'anthropic',
   aiModels: {},
   aiBaseUrls: {},
+  autoSummary: true,
   language: 'en',
   captureSystemAudio: true,
   micDeviceId: null,
@@ -151,6 +153,7 @@ export function publicSettings(): Settings {
     aiKeys: perProvider(keyStatus),
     aiModels: perProvider((p) => modelFor(s, p)),
     aiBaseUrls: perProvider((p) => baseUrlFor(s, p)),
+    autoSummary: s.autoSummary,
     language: s.language,
     captureSystemAudio: s.captureSystemAudio,
     micDeviceId: s.micDeviceId,
@@ -210,6 +213,7 @@ export function updateSettings(update: SettingsUpdate): Settings {
     if (baseUrl !== undefined && AI_PROVIDERS[p].baseUrlEditable) next.aiBaseUrls[p] = normalizeBaseUrl(baseUrl)
   }
 
+  if (update.autoSummary !== undefined) next.autoSummary = update.autoSummary
   if (update.language !== undefined) next.language = update.language
   if (update.captureSystemAudio !== undefined) next.captureSystemAudio = update.captureSystemAudio
   if (update.micDeviceId !== undefined) next.micDeviceId = update.micDeviceId

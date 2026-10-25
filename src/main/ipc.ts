@@ -12,7 +12,16 @@ import type {
   SettingsUpdate,
   TemplateId
 } from '../shared/types'
-import { askAboutMeeting, cancelAi, enhanceNotes, listModels } from './ai'
+import {
+  askAboutMeeting,
+  cancelAi,
+  cancelMeetingAi,
+  enhanceNotes,
+  enhanceProgress,
+  listModels,
+  resumeSummaries,
+  summarizeRecording
+} from './ai'
 import { applyCallDetectionSetting, linkCall, pendingCall } from './calls'
 import { createMeeting, deleteMeeting, getMeeting, listMeetings, meetingsDir, updateMeeting } from './meetings'
 import { openPrivacySettings, permissionStatus, requestMicrophone } from './media'
@@ -47,6 +56,8 @@ function asPatch(value: unknown): MeetingPatch {
   if (typeof raw.title === 'string') patch.title = raw.title
   if (typeof raw.notes === 'string') patch.notes = raw.notes
   if (typeof raw.enhancedNotes === 'string' || raw.enhancedNotes === null) patch.enhancedNotes = raw.enhancedNotes
+  // Notes changed from the window are the user's, so they're never replaced automatically.
+  if (typeof raw.enhancedNotes === 'string') patch.enhancedEdited = raw.enhancedNotes.trim() !== ''
   if (TEMPLATES.includes(raw.template as TemplateId)) patch.template = raw.template as TemplateId
   return patch
 }
@@ -69,6 +80,7 @@ function asSettingsUpdate(value: unknown): SettingsUpdate {
   if (raw.localModel === 'tiny' || raw.localModel === 'base' || raw.localModel === 'small') update.localModel = raw.localModel
   if (typeof raw.deepgramApiKey === 'string') update.deepgramApiKey = raw.deepgramApiKey
   if (isAiProviderId(raw.aiProvider)) update.aiProvider = raw.aiProvider
+  if (typeof raw.autoSummary === 'boolean') update.autoSummary = raw.autoSummary
   update.aiKeys = asProviderStrings(raw.aiKeys)
   update.aiModels = asProviderStrings(raw.aiModels)
   update.aiBaseUrls = asProviderStrings(raw.aiBaseUrls)
@@ -111,6 +123,9 @@ export function registerIpc(): void {
   const emitAi = (event: AiEvent): void => broadcast(IPC.aiEvent, event)
   recorder.on('state', (state) => broadcast(IPC.recordingStateChanged, state))
   recorder.on('transcript', (event) => broadcast(IPC.transcriptEvent, event))
+  recorder.on('finished', (meetingId, summarize) => {
+    if (summarize && loadSettings().autoSummary) void summarizeRecording(meetingId, emitAi)
+  })
   whisperEngine.on('status', (status) => broadcast(IPC.transcriberStatus, status))
 
   ipcMain.handle(IPC.meetingsList, () => listMeetings())
@@ -119,7 +134,8 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.meetingsUpdate, (_e, id, patch) => updateMeeting(asString(id, 'id'), asPatch(patch)))
   ipcMain.handle(IPC.meetingsRemove, async (_e, id) => {
     const meetingId = asString(id, 'id')
-    if (recorder.state().meetingId === meetingId) await recorder.stop()
+    if (recorder.state().meetingId === meetingId) await recorder.stop({ summarize: false })
+    cancelMeetingAi(meetingId)
     await deleteMeeting(meetingId)
   })
 
@@ -138,6 +154,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.aiEnhance, (_e, id) => enhanceNotes(asString(id, 'id'), emitAi))
   ipcMain.handle(IPC.aiAsk, (_e, id, question) => askAboutMeeting(asString(id, 'id'), asString(question, 'question'), emitAi))
   ipcMain.on(IPC.aiCancel, (_e, requestId) => cancelAi(asString(requestId, 'requestId')))
+  ipcMain.handle(IPC.aiProgress, (_e, id) => enhanceProgress(asString(id, 'id')))
   ipcMain.handle(IPC.aiListModels, (_e, request: ModelListRequest) => {
     if (!isAiProviderId(request?.provider)) throw new Error('Unknown AI provider')
     return listModels({
@@ -158,7 +175,9 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.callsCurrent, () => pendingCall())
-  ipcMain.handle(IPC.callsLink, (_e, callId, meetingId) => linkCall(asString(callId, 'callId'), asString(meetingId, 'meetingId')))
+  ipcMain.handle(IPC.callsLink, (_e, callId, meetingId, appName) =>
+    linkCall(asString(callId, 'callId'), asString(meetingId, 'meetingId'), typeof appName === 'string' ? appName : '')
+  )
 
   ipcMain.handle(IPC.permissionsStatus, () => permissionStatus())
   ipcMain.handle(IPC.permissionsRequestMic, () => requestMicrophone())
@@ -171,4 +190,6 @@ export function registerIpc(): void {
     await mkdir(meetingsDir(), { recursive: true })
     await shell.openPath(meetingsDir())
   })
+
+  void resumeSummaries(emitAi)
 }

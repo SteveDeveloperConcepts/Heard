@@ -121,12 +121,16 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== 'darwin') app.quit()
   })
 
-  // Finish the recording (and its last transcript results) before exiting.
+  // Finish the recording (and its last transcript results, also for one just stopped) before
+  // exiting. Its summary is written the next time SteveNola starts.
   app.on('before-quit', (event) => {
     quitting = true
-    if (!recorder.isActive()) return
+    if (!recorder.isActive() && !recorder.isFinishing()) return
     event.preventDefault()
-    void recorder.stop().finally(() => app.quit())
+    void recorder
+      .stop()
+      .then(() => recorder.whenFinished())
+      .finally(() => app.quit())
   })
 
   app.on('will-quit', () => {

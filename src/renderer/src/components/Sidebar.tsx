@@ -75,7 +75,9 @@ export function BrandMark() {
 export function Sidebar({ meetings, selectedId, recording, onSelect, onRename, onNew, onOpenSettings }: Props) {
   const [query, setQuery] = useState('')
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
-  const [renamingId, setRenamingId] = useState<string | null>(null)
+  // The meeting being renamed and its title when the box opened. The box keeps showing that title,
+  // so a title the AI gives meanwhile neither changes the text nor gets overwritten by it unchanged.
+  const [renamingItem, setRenamingItem] = useState<{ id: string; from: string } | null>(null)
   // Enter, Escape and blur can all end the same rename; only the first one counts.
   const renaming = useRef<string | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -91,22 +93,22 @@ export function Sidebar({ meetings, selectedId, recording, onSelect, onRename, o
   function startRename(id: string) {
     setMenu(null)
     renaming.current = id
-    setRenamingId(id)
+    setRenamingItem({ id, from: meetings.find((m) => m.id === id)?.title ?? '' })
   }
 
-  function finishRename(id: string, value: string | null) {
+  function finishRename(id: string, value: string | null, from: string) {
     if (renaming.current !== id) return
     renaming.current = null
-    setRenamingId(null)
+    setRenamingItem(null)
     const title = value?.trim()
-    if (title && title !== meetings.find((m) => m.id === id)?.title) onRename(id, title)
+    if (title && title !== from.trim()) onRename(id, title)
     // Put keyboard focus back on the meeting that was renamed.
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-meeting-id="${id}"]`)?.focus())
   }
 
-  function onRenameKey(e: KeyboardEvent<HTMLInputElement>, id: string) {
-    if (e.key === 'Enter') finishRename(id, e.currentTarget.value)
-    else if (e.key === 'Escape') finishRename(id, null)
+  function onRenameKey(e: KeyboardEvent<HTMLInputElement>, id: string, from: string) {
+    if (e.key === 'Enter') finishRename(id, e.currentTarget.value, from)
+    else if (e.key === 'Escape') finishRename(id, null, from)
   }
 
   const groups = useMemo(() => {
@@ -155,18 +157,19 @@ export function Sidebar({ meetings, selectedId, recording, onSelect, onRename, o
                   {m.hasEnhancedNotes && ' · Notes ready'}
                 </span>
               )
-              if (m.id === renamingId) {
+              if (m.id === renamingItem?.id) {
+                const { from } = renamingItem
                 return (
                   <div key={m.id} className="meeting-item renaming">
                     <input
                       className="rename-input"
-                      defaultValue={m.title}
+                      defaultValue={from}
                       placeholder="Untitled meeting"
                       aria-label="Meeting name"
                       autoFocus
                       onFocus={(e) => e.currentTarget.select()}
-                      onKeyDown={(e) => onRenameKey(e, m.id)}
-                      onBlur={(e) => finishRename(m.id, e.currentTarget.value)}
+                      onKeyDown={(e) => onRenameKey(e, m.id, from)}
+                      onBlur={(e) => finishRename(m.id, e.currentTarget.value, from)}
                     />
                     {meta}
                   </div>

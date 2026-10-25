@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AI_PROVIDERS } from '../../shared/providers'
+import { aiSetupProblem } from '../../shared/providers'
 import type { CallInfo, MeetingSummary, Settings } from '../../shared/types'
 import { CallBanner } from './components/CallBanner'
 import { Icon } from './components/Icon'
@@ -12,10 +12,7 @@ function setupProblem(s: Settings): string | null {
   if (s.transcriptionEngine === 'deepgram' && s.deepgramKey === 'none') {
     return 'Add a Deepgram API key, or switch to built-in transcription in Settings.'
   }
-  const info = AI_PROVIDERS[s.aiProvider]
-  if (info.keyRequired && s.aiKeys[s.aiProvider] === 'none') return `Add a ${info.label} API key to enhance notes.`
-  if (!s.aiModels[s.aiProvider]) return `Choose a ${info.label} model to enhance notes.`
-  return null
+  return aiSetupProblem(s)
 }
 
 function Welcome({ onNew }: { onNew(): void }) {
@@ -84,6 +81,15 @@ export function App() {
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const onMeetingChanged = useCallback(() => void refresh(), [refresh])
 
+  // Notes and titles written after a recording stops show in the list, whichever meeting is open.
+  useEffect(
+    () =>
+      window.api.ai.onEvent((event) => {
+        if (event.type === 'done' && event.task !== 'ask') void refresh()
+      }),
+    [refresh]
+  )
+
   // Detected calls only ever ask; recording starts when the user picks Record.
   const [callPrompt, setCallPrompt] = useState<CallInfo | null>(null)
   const { start: startRecording } = recording
@@ -92,8 +98,8 @@ export function App() {
     async (call: CallInfo) => {
       setCallPrompt(null)
       const meeting = await window.api.meetings.create()
-      await window.api.meetings.update(meeting.id, { title: `${call.appName} call` })
-      await window.api.calls.link(call.id, meeting.id)
+      // Also names the meeting after the call, until the AI gives it a better title.
+      await window.api.calls.link(call.id, meeting.id, call.appName)
       await refresh()
       setSelectedId(meeting.id)
       await startRecording(meeting.id)
