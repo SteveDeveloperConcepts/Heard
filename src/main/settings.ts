@@ -31,6 +31,9 @@ interface StoredSettings {
   emailGreeting: string
   callDetection: boolean
   stopWhenCallEnds: boolean
+  liveTranscript: boolean
+  keepInTray: boolean
+  openAtLogin: boolean
 }
 
 export interface AiConfig {
@@ -54,7 +57,10 @@ const DEFAULTS: StoredSettings = {
   gmailAccount: '',
   emailGreeting: 'Hi all,',
   callDetection: true,
-  stopWhenCallEnds: true
+  stopWhenCallEnds: true,
+  liveTranscript: false,
+  keepInTray: true,
+  openAtLogin: false
 }
 
 function envVar(name: SecretName): string | undefined {
@@ -152,7 +158,12 @@ export function publicSettings(): Settings {
     gmailAccount: s.gmailAccount,
     emailGreeting: s.emailGreeting,
     callDetection: s.callDetection,
-    stopWhenCallEnds: s.stopWhenCallEnds
+    stopWhenCallEnds: s.stopWhenCallEnds,
+    liveTranscript: s.liveTranscript,
+    keepInTray: s.keepInTray,
+    openAtLogin: s.openAtLogin,
+    // Only an installed app can register itself; a run from source would start bare Electron.
+    openAtLoginAvailable: app.isPackaged
   }
 }
 
@@ -211,6 +222,9 @@ export function updateSettings(update: SettingsUpdate): Settings {
   if (update.emailGreeting !== undefined) next.emailGreeting = update.emailGreeting.trim().slice(0, 200)
   if (update.callDetection !== undefined) next.callDetection = update.callDetection
   if (update.stopWhenCallEnds !== undefined) next.stopWhenCallEnds = update.stopWhenCallEnds
+  if (update.liveTranscript !== undefined) next.liveTranscript = update.liveTranscript
+  if (update.keepInTray !== undefined) next.keepInTray = update.keepInTray
+  if (update.openAtLogin !== undefined) next.openAtLogin = update.openAtLogin
 
   save(next)
   return publicSettings()

@@ -341,6 +341,7 @@ export function MeetingView({ meetingId, settings, recording, renamed, onChanged
             segments={meeting.transcript}
             interim={interim}
             live={liveHere}
+            hideWhileLive={!settings?.liveTranscript}
             meter={recording.meter}
             sources={recording.state.sources}
           />

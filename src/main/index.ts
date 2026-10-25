@@ -6,6 +6,7 @@ import { configureMediaAccess, enableMacSystemAudio } from './media'
 import { registerIpc } from './ipc'
 import { recorder } from './recorder'
 import { loadSettings } from './settings'
+import { startedAtLogin } from './startup'
 import { whisperEngine } from './transcription/whisper-engine'
 import { createTray } from './tray'
 
@@ -15,6 +16,7 @@ enableMacSystemAudio(loadSettings().macAudioBackend)
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null // held so it isn't garbage-collected
 let quitting = false
+let toldAboutTray = false
 
 /** The generated app icon, used while running from source (`npm run icons` makes it). */
 function devIcon(): string {
@@ -31,7 +33,12 @@ function showWindow(): void {
   mainWindow.focus()
 }
 
-function createWindow(): void {
+function notify(title: string, body: string): void {
+  if (Notification.isSupported()) new Notification({ title, body }).show()
+}
+
+/** `visible: false` creates the window hidden, e.g. when starting at login. */
+function createWindow({ visible = true } = {}): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -53,7 +60,7 @@ function createWindow(): void {
   mainWindow = win
   configureMediaAccess(win.webContents)
 
-  win.once('ready-to-show', () => win.show())
+  if (visible) win.once('ready-to-show', () => win.show())
 
   // Links open in the default browser; the app window never navigates away from its own page.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -62,16 +69,25 @@ function createWindow(): void {
   })
   win.webContents.on('will-navigate', (event) => event.preventDefault())
 
-  // Closing the window mid-meeting keeps recording in the background, and says so.
+  // Closing the window hides it instead: always mid-meeting, so recording continues, and otherwise
+  // when the user wants SteveNola kept in the tray to catch calls. Either way it says so.
   win.on('close', (event) => {
-    if (quitting || !recorder.isActive()) return
+    if (quitting) return
+    const recording = recorder.isActive()
+    if (!recording && !loadSettings().keepInTray) return
     event.preventDefault()
-    win.hide()
-    if (Notification.isSupported()) {
-      new Notification({
-        title: 'SteveNola is still recording',
-        body: 'Stop it from the tray icon, or reopen the window.'
-      }).show()
+    // Hiding a full-screen Mac window would leave an empty full-screen Space behind.
+    if (win.isFullScreen()) {
+      win.once('leave-full-screen', () => win.hide())
+      win.setFullScreen(false)
+    } else {
+      win.hide()
+    }
+    if (recording) {
+      notify('SteveNola is still recording', 'Stop it from the tray icon, or reopen the window.')
+    } else if (!toldAboutTray) {
+      toldAboutTray = true
+      notify('SteveNola is still running', 'It keeps watching for calls from the tray. Quit from the tray icon.')
     }
   })
   win.on('closed', () => {
@@ -94,7 +110,8 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'win32') app.setAppUserModelId(app.isPackaged ? 'com.developerconcepts.stevenola' : process.execPath)
     if (!app.isPackaged) app.dock?.setIcon(devIcon())
     registerIpc()
-    createWindow()
+    // Started at login: wait in the tray (the hidden window still hears about calls).
+    createWindow({ visible: !startedAtLogin() })
     tray = createTray(showWindow)
     setupCallDetection(showWindow)
     app.on('activate', showWindow)

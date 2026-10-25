@@ -45,9 +45,15 @@ export function configureMediaAccess(contents: WebContents): void {
     return permission === 'media' || permission === 'clipboard-sanitized-write'
   })
 
-  ses.setPermissionRequestHandler((wc, permission, callback) => {
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     if (!isAppContents(wc)) return callback(false)
     if (permission === 'media') return callback(armed)
+    // Since Electron 45, getDisplayMedia asks for 'display-capture' before the display media
+    // handler below runs; refusing it fails the call outright. Only system audio is ever wanted.
+    if (permission === 'display-capture') {
+      const withAudio = 'mediaTypes' in details && details.mediaTypes?.includes('audio') === true
+      return callback(armed && withAudio)
+    }
     if (permission === 'clipboard-sanitized-write') return callback(true)
     callback(false)
   })
@@ -56,11 +62,17 @@ export function configureMediaAccess(contents: WebContents): void {
   // but only while armed, and only to our own window. The renderer discards the video track.
   ses.setDisplayMediaRequestHandler((request, callback) => {
     const requester = request.frame ? webContents.fromFrame(request.frame) : undefined
-    if (!armed || !isAppContents(requester) || !request.audioRequested) return callback(null)
+    if (!armed || !isAppContents(requester) || !request.audioRequested) {
+      console.warn('System audio request refused:', { armed, ownWindow: isAppContents(requester), audio: request.audioRequested })
+      return callback(null)
+    }
     desktopCapturer
-      .getSources({ types: ['screen'] })
+      .getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
       .then((sources) => {
-        if (!armed || sources.length === 0) return callback(null)
+        if (!armed || sources.length === 0) {
+          console.warn('System audio request refused:', { armed, screens: sources.length })
+          return callback(null)
+        }
         callback({ video: sources[0], audio: 'loopback' })
       })
       .catch((err) => {

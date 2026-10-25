@@ -47,6 +47,7 @@ export class AudioCapture {
         this.attach('system', await this.openSystemAudio())
         live.push('system')
       } catch (err) {
+        console.warn('System audio failed:', err)
         this.callbacks.onSourceEnded('system', describeSystemAudioError(err))
       }
     }

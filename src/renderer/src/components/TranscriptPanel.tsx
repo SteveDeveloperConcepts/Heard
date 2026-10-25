@@ -8,6 +8,8 @@ interface Props {
   segments: TranscriptSegment[]
   interim: Partial<Record<AudioSource, string>>
   live: boolean
+  /** Keep the words out of sight until recording stops (they're still transcribed meanwhile). */
+  hideWhileLive: boolean
   meter: VoiceMeter
   sources: AudioSource[]
 }
@@ -22,7 +24,16 @@ function TypingDots() {
   )
 }
 
-export function TranscriptPanel({ segments, interim, live, meter, sources }: Props) {
+function ListeningChips({ meter, sources }: { meter: VoiceMeter; sources: AudioSource[] }) {
+  return (
+    <div className="listening-chips">
+      <VoiceChip meter={meter} source="mic" label="Me" tone="light" />
+      {sources.includes('system') && <VoiceChip meter={meter} source="system" label="Them" tone="light" />}
+    </div>
+  )
+}
+
+export function TranscriptPanel({ segments, interim, live, hideWhileLive, meter, sources }: Props) {
   const turns = useMemo(() => groupTurns(segments), [segments])
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinnedToBottom = useRef(true)
@@ -40,17 +51,26 @@ export function TranscriptPanel({ segments, interim, live, meter, sources }: Pro
 
   const pending = (Object.entries(interim) as [AudioSource, string | undefined][]).filter(([, text]) => text)
 
+  if (live && hideWhileLive) {
+    return (
+      <div className="listening-empty">
+        <ListeningChips meter={meter} sources={sources} />
+        <p>
+          Listening and transcribing. The transcript appears here when you stop recording.
+          {segments.length > 0 && <span className="listening-count">{segments.length} lines so far</span>}
+        </p>
+      </div>
+    )
+  }
+
   if (turns.length === 0 && pending.length === 0) {
     return live ? (
       <div className="listening-empty">
-        <div className="listening-chips">
-          <VoiceChip meter={meter} source="mic" label="Me" tone="light" />
-          {sources.includes('system') && <VoiceChip meter={meter} source="system" label="Them" tone="light" />}
-        </div>
+        <ListeningChips meter={meter} sources={sources} />
         <p>Listening. Start talking and the words appear here.</p>
       </div>
     ) : (
-      <div className="panel-empty">The transcript appears here while you record.</div>
+      <div className="panel-empty">The transcript appears here after you record.</div>
     )
   }
 

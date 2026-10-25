@@ -1040,6 +1040,14 @@ a:hover {
 
 .listening-empty p {
   margin: 0;
+  max-width: 280px;
+}
+
+.listening-count {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .listening-chips {

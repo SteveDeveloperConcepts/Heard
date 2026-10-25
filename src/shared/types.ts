@@ -79,6 +79,14 @@ export interface Settings {
   callDetection: boolean
   /** Stop a recording that was started from a detected call when that call ends. */
   stopWhenCallEnds: boolean
+  /** Show the transcript as it's written; otherwise it appears when recording stops. */
+  liveTranscript: boolean
+  /** Closing the window leaves SteveNola running in the tray, still watching for calls. */
+  keepInTray: boolean
+  /** Start SteveNola, in the tray, when the user logs in. */
+  openAtLogin: boolean
+  /** False when running from source, which can't register itself to start at login. */
+  openAtLoginAvailable: boolean
 }
 
 export interface SettingsUpdate {
@@ -100,6 +108,9 @@ export interface SettingsUpdate {
   emailGreeting?: string
   callDetection?: boolean
   stopWhenCallEnds?: boolean
+  liveTranscript?: boolean
+  keepInTray?: boolean
+  openAtLogin?: boolean
 }
 
 export interface GmailDraft {

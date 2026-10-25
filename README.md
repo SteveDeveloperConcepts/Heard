@@ -41,7 +41,7 @@ Start SteveNola:
 npm run dev
 ```
 
-The window opens after a few seconds, and code changes reload automatically. To quit, close the window (Windows) or choose **Quit** from the tray icon's menu (the menu bar on a Mac). You can also press Ctrl+C in the terminal. Closing the window during a recording keeps recording in the background.
+The window opens after a few seconds, and code changes reload automatically. Closing the window leaves SteveNola running in the tray (the menu bar on a Mac) so it can catch calls. To quit, choose **Quit** from the tray icon's menu, or press Ctrl+C in the terminal.
 
 ### First launch
 
@@ -99,7 +99,7 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 - **Listens only while recording.** The main process refuses every microphone and system-audio request unless a recording is armed ([src/main/media.ts](src/main/media.ts)). Stopping releases the devices, closes the transcription streams and disarms capture. While recording, the tray icon is a red dot (a hollow ring otherwise). Closing the window mid-meeting keeps recording, and a notification tells you so.
 - **System audio without drivers.** Windows uses WASAPI loopback through Chromium. macOS 13+ uses ScreenCaptureKit (or a Core Audio tap on 14.2+), turned on with Chromium feature switches. In both cases the app asks for display media, keeps the audio track and throws the video away.
 - **Your notes drive the AI notes.** Enhance sends your typed notes, the transcript and a structure template (General, 1:1, Customer call, Standup, Interview) to the AI. Prompts are in [src/main/ai/prompts.ts](src/main/ai/prompts.ts).
-- **Local storage.** Meetings are JSON files in the app's data folder (Settings → Privacy → Open data folder). Audio is never written to disk. API keys are encrypted with the OS keychain (`safeStorage`).
+- **Local storage.** Meetings are JSON files in the app's data folder (Settings → Privacy → Open data folder). Audio is never written to disk. API keys are saved as soon as you paste them and encrypted with Electron's `safeStorage`: Windows data protection (DPAPI, tied to your Windows account) or the macOS Keychain. They're never stored as plain text, shown again, or sent anywhere except to that provider.
 
 ## Share notes by email (Gmail)
 
@@ -113,12 +113,15 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 
 ## Call detection
 
-When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, SteveNola shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches).
+When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, or a Google Meet, Teams, Zoom or Webex call starts in your browser, SteveNola shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches).
 
-Detection reads only which apps are using the mic, not audio ([src/main/calls/](src/main/calls)):
+SteveNola has to be running to notice calls. Closing the window leaves it in the tray (the menu bar on a Mac), and the installed app can start there when you log in (Settings → Calls).
+
+Detection reads which apps are using the mic, never audio ([src/main/calls/](src/main/calls)):
 
 - **Windows:** the per-app microphone usage that Windows keeps in the registry (the same data behind the taskbar's "microphone in use" icon), checked every 3 seconds. Works for the Microsoft Store WhatsApp app and desktop apps alike.
-- **macOS:** a small Swift helper ([native/mac/call-monitor.swift](native/mac/call-monitor.swift)) reads Core Audio's per-process input state (macOS 14.2+). On macOS 13–14.1 it can only tell that *some* app is using the mic, so it assumes a running call app is the one. In that mode the recording can't stop itself when the call ends. `npm run dist:mac` builds the helper; for `npm run dev` on a Mac, run `npm run helper:mac` once first.
+- **macOS:** a small Swift helper ([native/mac/call-monitor.swift](native/mac/call-monitor.swift)) reads Core Audio's per-process input state (macOS 14.2+). On macOS 13–14.1 it can only tell that *some* app is using the mic, so it assumes a running call app is the one. In that mode the recording can't stop itself when the call ends, and browser calls aren't detected. `npm run dist:mac` builds the helper; for `npm run dev` on a Mac, run `npm run helper:mac` once first.
+- **Browser calls:** a browser using the mic could be doing anything, so SteveNola then checks the titles of open windows. A browser window's title is its current tab ("Meet - abc-defg-hij - Google Chrome"). Titles are only read while a browser holds the mic, only checked for a call, and never saved or sent anywhere. Once found, the call lasts until the browser lets go of the mic, so switching tabs doesn't end it. The Meet tab must be the visible tab of a window that isn't minimized when the call starts, or when you switch back to it. A Meet window's title is unique, so Meet is also found in the installed Meet app and on a Mac. Teams, Zoom and Webex windows look the same as their desktop apps', so those web calls are only recognised in a Windows browser window. On a Mac, reading window titles needs the Screen & System Audio Recording permission.
 
 Recording laws differ by country and state. Some require everyone's consent, so the prompt reminds you to tell people you're recording.
 
@@ -147,7 +150,7 @@ Built in by default: OpenAI's open Whisper speech-recognition model runs on your
 - **Speed:** measured on the development PC, the Balanced model took about 1 second per spoken sentence, faster than real time. If a slow computer falls behind, the recording bar says so and the transcript catches up.
 - **Deepgram:** still available as an optional cloud engine in Settings → Transcription. It needs an API key, or `DEEPGRAM_API_KEY`.
 
-While recording, the **Me** and **Them** chips in the recording bar and at the top of the transcript move with each voice and glow green while that person is talking, so you can see it's hearing both sides.
+While recording, the **Me** and **Them** chips in the recording bar and at the top of the transcript move with each voice and glow green while that person is talking, so you can see it's hearing both sides. SteveNola transcribes as you go, but by default the transcript only appears when you stop recording; Settings → Transcription → **Show the transcript while recording** shows it live.
 
 ## Develop
 
@@ -187,5 +190,5 @@ The screens follow the **SteveNola Screens** design canvas: https://claude.ai/ar
 - Without headphones, your mic also picks up the other participants from your speakers, so their words can appear twice (once as "Me"). Echo cancellation reduces this but doesn't remove it.
 - Built-in transcription on macOS needs an Apple Silicon Mac: ONNX Runtime 1.30 ships no Intel-Mac build. On Intel Macs, use Deepgram.
 - Built-in transcription labels everyone on the call "Them". Separating several remote voices (Speaker 1, 2, …) works only with Deepgram.
-- No calendar integration. Call detection covers the desktop apps listed above, not calls in a web browser (such as Google Meet), because browsers use the mic for many other things.
+- No calendar integration. Browser calls are recognised by window title, so only Google Meet (and, in a Windows browser, Teams, Zoom and Webex) are detected, and only when their tab is showing at some point during the call.
 - The macOS call-detection helper hasn't been compiled or run yet (it was written on Windows).

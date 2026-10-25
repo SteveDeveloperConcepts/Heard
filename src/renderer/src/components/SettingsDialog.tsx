@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AI_PROVIDERS, AI_PROVIDER_IDS } from '../../../shared/providers'
 import type {
   AiProviderId,
@@ -87,13 +87,19 @@ interface KeyFieldProps {
   optional?: boolean
   value: string
   onChange(value: string): void
+  /** Stores the key (encrypted) once it's pasted or the field is left. */
+  onCommit(value: string): void
   onRemove(): void
 }
 
-function KeyField({ id, label, status, envVar, keyUrl, optional, value, onChange, onRemove }: KeyFieldProps) {
+const KEY_PROTECTION = window.api.platform === 'darwin' ? 'your macOS Keychain' : 'Windows data protection'
+// API keys are long runs of letters, digits, '-', '_' and '.'; links and emails aren't.
+const LOOKS_LIKE_KEY = /^[\w.-]{20,}$/
+
+function KeyField({ id, label, status, envVar, keyUrl, optional, value, onChange, onCommit, onRemove }: KeyFieldProps) {
   const placeholder =
     status === 'stored'
-      ? 'Saved in your keychain. Type to replace it.'
+      ? 'Saved and encrypted. Paste a new key to replace it.'
       : status === 'environment'
         ? `Using ${envVar} from the environment`
         : optional
@@ -118,6 +124,15 @@ function KeyField({ id, label, status, envVar, keyUrl, optional, value, onChange
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={(e) => {
+            const input = e.currentTarget
+            // Store once the pasted text is in the field.
+            requestAnimationFrame(() => onCommit(input.value))
+          }}
+          onBlur={(e) => {
+            // Not when the whole window loses focus (switching apps halfway through typing).
+            if (document.hasFocus()) onCommit(e.currentTarget.value)
+          }}
         />
         {status === 'stored' && (
           <button type="button" className="btn btn-ghost small" onClick={onRemove}>
@@ -125,6 +140,7 @@ function KeyField({ id, label, status, envVar, keyUrl, optional, value, onChange
           </button>
         )}
       </div>
+      {status === 'stored' && <span className="hint">Encrypted on this computer with {KEY_PROTECTION}. Only sent to the provider.</span>}
     </div>
   )
 }
@@ -160,6 +176,9 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
   const [emailGreeting, setEmailGreeting] = useState(settings.emailGreeting)
   const [callDetection, setCallDetection] = useState(settings.callDetection)
   const [stopWhenCallEnds, setStopWhenCallEnds] = useState(settings.stopWhenCallEnds)
+  const [liveTranscript, setLiveTranscript] = useState(settings.liveTranscript)
+  const [keepInTray, setKeepInTray] = useState(settings.keepInTray)
+  const [openAtLogin, setOpenAtLogin] = useState(settings.openAtLogin)
   const [mics, setMics] = useState<MediaDeviceInfo[]>([])
   const [permissions, setPermissions] = useState<PermissionStatus | null>(null)
   const [saving, setSaving] = useState(false)
@@ -181,11 +200,11 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') void saveRef.current()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
 
   async function loadModels() {
     setLoadingModels(true)
@@ -215,7 +234,28 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
     }
   }
 
+  /**
+   * Stores a key as soon as it's entered (the main process encrypts it), then drops the typed copy.
+   * Text that doesn't look like a key (a pasted link, half a key) stays in the field until Done.
+   */
+  async function storeKey(target: 'deepgram' | AiProviderId, value: string) {
+    const key = value.trim()
+    if (!LOOKS_LIKE_KEY.test(key)) return
+    try {
+      const update: SettingsUpdate = target === 'deepgram' ? { deepgramApiKey: key } : { aiKeys: { [target]: key } }
+      onSaved(await window.api.settings.update(update))
+      if (target === 'deepgram') setDeepgramKey((v) => (v.trim() === key ? '' : v))
+      else setAiKeys((k) => (k[target]?.trim() === key ? { ...k, [target]: '' } : k))
+    } catch (err) {
+      setError(cleanIpcError(err))
+    }
+  }
+
+  // Closing Settings any way (✕, Escape, clicking outside, Done) keeps the changes.
+  const savingRef = useRef(false)
   async function save() {
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     setError(null)
     try {
@@ -234,6 +274,9 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
         emailGreeting,
         callDetection,
         stopWhenCallEnds,
+        liveTranscript,
+        keepInTray,
+        openAtLogin,
         ...(deepgramKey.trim() ? { deepgramApiKey: deepgramKey } : {}),
         ...(Object.keys(typedKeys).length ? { aiKeys: typedKeys } : {})
       }
@@ -242,9 +285,12 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
     } catch (err) {
       setError(cleanIpcError(err))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
+  const saveRef = useRef(save)
+  saveRef.current = save
 
   const models = [...new Set([...info.suggestedModels, ...(modelOptions[provider] ?? [])])]
   const model = aiModels[provider] ?? ''
@@ -266,7 +312,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) void save()
       }}
     >
       <div className="modal modal-settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -274,7 +320,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
           <h2 id="settings-title" className="grow">
             Settings
           </h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn" onClick={() => void save()} aria-label="Close">
             <Icon name="close" />
           </button>
         </header>
@@ -341,6 +387,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                       optional={!info.keyRequired}
                       value={aiKeys[provider] ?? ''}
                       onChange={(v) => setAiKeys((k) => ({ ...k, [provider]: v }))}
+                      onCommit={(v) => void storeKey(provider, v)}
                       onRemove={() => void removeKey(provider)}
                     />
                   )}
@@ -446,6 +493,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                     keyUrl="https://console.deepgram.com/"
                     value={deepgramKey}
                     onChange={setDeepgramKey}
+                    onCommit={(v) => void storeKey('deepgram', v)}
                     onRemove={() => void removeKey('deepgram')}
                   />
                 )}
@@ -461,6 +509,15 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                     ))}
                   </select>
                 </div>
+                <label className="checkbox">
+                  <input type="checkbox" checked={liveTranscript} onChange={(e) => setLiveTranscript(e.target.checked)} />
+                  <span>
+                    Show the transcript while recording
+                    <span className="hint">
+                      When off, SteveNola still transcribes as you go, but the transcript appears only when you stop recording.
+                    </span>
+                  </span>
+                </label>
               </section>
             )}
 
@@ -542,13 +599,16 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
               <section className="stack">
                 <SectionHeading
                   title="Calls"
-                  detail="SteveNola can notice when WhatsApp, Zoom, Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone and ask whether to record. It only checks which apps use the mic; it hears nothing until you say yes."
+                  detail="SteveNola can notice when WhatsApp, Zoom, Teams, Slack, Discord, FaceTime, Skype or Webex starts a call, or a Google Meet, Teams, Zoom or Webex call starts in your browser, and ask whether to record. It only checks which apps use the mic, and, while a browser does, the titles of open windows; it hears nothing until you say yes."
                 />
                 <label className="checkbox">
                   <input type="checkbox" checked={callDetection} onChange={(e) => setCallDetection(e.target.checked)} />
                   <span>
                     Ask to record when a call starts
-                    <span className="hint">You get a notification and a prompt in the app. Recording never starts by itself.</span>
+                    <span className="hint">
+                      You get a notification and a prompt in the app. Recording never starts by itself.
+                      {isMac && ' Calls in a browser also need the Screen & System Audio Recording permission (see Audio).'}
+                    </span>
                   </span>
                 </label>
                 <label className="checkbox">
@@ -561,6 +621,32 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                   <span>
                     Stop recording when the call ends
                     <span className="hint">Only for recordings started from a call prompt.</span>
+                  </span>
+                </label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={keepInTray} onChange={(e) => setKeepInTray(e.target.checked)} />
+                  <span>
+                    Keep running when you close the window
+                    <span className="hint">
+                      SteveNola stays in the {isMac ? 'menu bar' : 'tray'} and keeps watching for calls. Quit from its{' '}
+                      {isMac ? 'menu bar' : 'tray'} icon.
+                    </span>
+                  </span>
+                </label>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={openAtLogin}
+                    disabled={!settings.openAtLoginAvailable}
+                    onChange={(e) => setOpenAtLogin(e.target.checked)}
+                  />
+                  <span>
+                    Start SteveNola when you log in
+                    <span className="hint">
+                      {settings.openAtLoginAvailable
+                        ? `It starts in the ${isMac ? 'menu bar' : 'tray'}, ready for your first call.`
+                        : 'Available in the installed app, not when running from source.'}
+                    </span>
                   </span>
                 </label>
               </section>
@@ -621,11 +707,13 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
             </span>
           )}
           <span className="spacer" />
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
+          {error && (
+            <button className="btn" onClick={onClose}>
+              Close without saving
+            </button>
+          )}
           <button className="btn btn-primary" disabled={saving} onClick={() => void save()}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : 'Done'}
           </button>
         </footer>
       </div>

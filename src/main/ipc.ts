@@ -17,6 +17,7 @@ import { applyCallDetectionSetting, linkCall, pendingCall } from './calls'
 import { createMeeting, deleteMeeting, getMeeting, listMeetings, meetingsDir, updateMeeting } from './meetings'
 import { openPrivacySettings, permissionStatus, requestMicrophone } from './media'
 import { recorder } from './recorder'
+import { applyOpenAtLogin } from './startup'
 import { loadSettings, publicSettings, updateSettings } from './settings'
 import { whisperEngine } from './transcription/whisper-engine'
 import { copyToClipboard, openGmailDraft } from './share'
@@ -81,6 +82,9 @@ function asSettingsUpdate(value: unknown): SettingsUpdate {
   if (typeof raw.emailGreeting === 'string') update.emailGreeting = raw.emailGreeting
   if (typeof raw.callDetection === 'boolean') update.callDetection = raw.callDetection
   if (typeof raw.stopWhenCallEnds === 'boolean') update.stopWhenCallEnds = raw.stopWhenCallEnds
+  if (typeof raw.liveTranscript === 'boolean') update.liveTranscript = raw.liveTranscript
+  if (typeof raw.keepInTray === 'boolean') update.keepInTray = raw.keepInTray
+  if (typeof raw.openAtLogin === 'boolean') update.openAtLogin = raw.openAtLogin
   return update
 }
 
@@ -145,8 +149,11 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.settingsGet, () => publicSettings())
   ipcMain.handle(IPC.settingsUpdate, (_e, update) => {
+    const wasOpenAtLogin = loadSettings().openAtLogin
     const settings = updateSettings(asSettingsUpdate(update))
     applyCallDetectionSetting()
+    // Only on a change, so turning it off in Windows' or macOS's own startup settings sticks.
+    if (settings.openAtLogin !== wasOpenAtLogin) applyOpenAtLogin()
     return settings
   })
 
