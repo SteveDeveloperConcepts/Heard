@@ -4,6 +4,15 @@ AI meeting notes for macOS and Windows. Hit record, jot quick notes, and SteveNo
 
 ## Install and run
 
+### Download
+
+Get the latest installer from [Releases](https://github.com/SteveDeveloperConcepts/SteveNola/releases/latest):
+
+- **Windows 10 or 11:** `SteveNola-Setup-<version>.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
+- **macOS 13 or later on Apple Silicon (M1 or newer):** `SteveNola-<version>-arm64.dmg`. Open it and drag SteveNola to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
+
+Then see [First launch](#first-launch). To run from the source code instead, read on.
+
 ### What you need
 
 - **Windows 10 or 11**, or **macOS 13 Ventura or later**. Built-in transcription on a Mac needs Apple Silicon (M1 or newer).
@@ -63,7 +72,7 @@ This also builds the call-detection helper, and makes `dist/SteveNola-0.1.0-arm6
 
 The installed app uses the same data folder as `npm run dev`, so your meetings, settings and downloaded speech model carry over.
 
-To share the Mac app with other people, sign it with an Apple Developer ID certificate and turn on notarization (`notarize: false` in [electron-builder.yml](electron-builder.yml)). Without that, Gatekeeper blocks it on their Macs, and macOS permission prompts may not stick between builds.
+The Mac app is only ad-hoc signed, so other people have to use **Open Anyway** too, and macOS asks for microphone and screen-audio permission again after each update. To avoid both, sign it with an Apple Developer ID certificate: remove `identity: '-'` and set `notarize: true` in [electron-builder.yml](electron-builder.yml).
 
 ### If something goes wrong
 
@@ -149,6 +158,20 @@ While recording, the **Me** and **Them** chips in the recording bar and at the t
 - `npm start` runs the bundled app without the dev server.
 - `npm run icons` regenerates the app icon in `build/`.
 - `npm run helper:mac` builds the Mac call-detection helper; it needs Xcode 15.1+ command line tools.
+
+### Publish a release
+
+GitHub builds both installers and publishes the release ([.github/workflows/release.yml](.github/workflows/release.yml)). Set the new version in `package.json`, commit and push it, then push a matching tag:
+
+```bash
+git tag v0.1.0
+```
+
+```bash
+git push origin v0.1.0
+```
+
+About 10 minutes later, the Windows and Mac installers appear on the [Releases](https://github.com/SteveDeveloperConcepts/SteveNola/releases) page. To test the builds without releasing, run the **Release** workflow by hand from the Actions tab; its installers are attached to the run.
 
 ## Permissions
 

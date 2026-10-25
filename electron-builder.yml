@@ -4,15 +4,16 @@ copyright: Copyright © 2026 Steve Vaubell
 directories:
   buildResources: build
   output: dist
+# Ship the bundled app in out/ and the production dependencies; leave the rest of the project out.
+# Keep every rule here: a `files` list under win: or mac: would replace this one, not add to it.
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!scripts/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.gitignore,README.md}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!electron-builder.yml'
-  - '!native/*'
+  - '!{src,scripts,native}/**'
+  - '!{README.md,electron.vite.config.ts,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Transformers.js has its own copy of the browser speech engine and never loads this package.
+  - '!**/node_modules/onnxruntime-web/**'
+  # Only the speech engine for the platform and processor being built (each is built on its own OS).
+  - '!**/node_modules/onnxruntime-node/bin/napi-v*/!(${platform})/**'
+  - '!**/node_modules/onnxruntime-node/bin/napi-v*/${platform}/!(${arch})/**'
 asar: true
 # Native speech-recognition runtime (ONNX Runtime, used by the built-in transcription) can't load from inside the asar.
 asarUnpack:
@@ -23,9 +24,8 @@ publish: null
 
 win:
   target:
-    - nsis
-  files:
-    - '!**/node_modules/onnxruntime-node/bin/napi-v*/{darwin,linux}/**'
+    - target: nsis
+      arch: x64
 nsis:
   oneClick: false
   perMachine: false
@@ -35,11 +35,13 @@ nsis:
 
 mac:
   category: public.app-category.productivity
+  # Apple Silicon only: ONNX Runtime, which runs the built-in transcription, has no Intel Mac build.
   target:
-    - dmg
-    - zip
-  files:
-    - '!**/node_modules/onnxruntime-node/bin/napi-v*/{win32,linux}/**'
+    - target: dmg
+      arch: arm64
+  # Ad-hoc signature, so a downloaded copy can be opened with "Open Anyway" instead of being
+  # reported as damaged. Remove this line once you sign with an Apple Developer ID certificate.
+  identity: '-'
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
