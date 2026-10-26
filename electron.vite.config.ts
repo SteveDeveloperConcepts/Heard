@@ -18,7 +18,7 @@ const CSP = [
 // Added to production builds only: dev mode needs inline scripts for React Fast Refresh.
 function contentSecurityPolicy(): Plugin {
   return {
-    name: 'stevenola-csp',
+    name: 'heard-csp',
     apply: 'build',
     transformIndexHtml() {
       return [

@@ -1,11 +1,11 @@
-# Reports which programs are capturing from a microphone, for SteveNola's call detection on Windows.
+# Reports which programs are capturing from a microphone, for Heard's call detection on Windows.
 # It reads Core Audio's list of audio sessions (what the volume mixer shows), so it never opens a
 # device or hears audio. Windows' own usage record in the registry stopped updating on some builds.
 #
 # Prints one JSON line whenever the set changes: {"sessions":[[exe, parent exe, ...], ...]}, one
 # entry per process with an active capture session, with up to three of its parents (WhatsApp and
 # the new Teams capture in a WebView2 child process). The capture of the process with id -OwnerPid
-# (SteveNola itself) is left out. Exits when that process is gone.
+# (Heard itself) is left out. Exits when that process is gone.
 param([int]$OwnerPid)
 
 $ErrorActionPreference = 'Stop'
@@ -16,7 +16,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace SteveNolaCallMonitor {
+namespace HeardCallMonitor {
   [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
   class MMDeviceEnumerator { }
 
@@ -195,8 +195,8 @@ namespace SteveNolaCallMonitor {
         uint current = pid;
         for (int depth = 0; depth < MaxDepth && names.ContainsKey(current); depth++) {
           if (current == (uint)ownerPid) {
-            // SteveNola's own capture runs in a child process of the same exe. A browser that
-            // SteveNola happened to open (a link, a Gmail draft) is its child too, but counts.
+            // Heard's own capture runs in a child process of the same exe. A browser that
+            // Heard happened to open (a link, a Gmail draft) is its child too, but counts.
             ours = chain.TrueForAll(path => ownerPath != null && string.Equals(path, ownerPath, StringComparison.OrdinalIgnoreCase));
             break;
           }
@@ -218,7 +218,7 @@ $last = $null
 while ($true) {
   try { [void][System.Diagnostics.Process]::GetProcessById($OwnerPid) } catch { exit 0 }
   try {
-    $report = [SteveNolaCallMonitor.Monitor]::Report($OwnerPid)
+    $report = [HeardCallMonitor.Monitor]::Report($OwnerPid)
   } catch {
     [Console]::Error.WriteLine("Audio session check failed: $($_.Exception.Message)")
     $report = '{"sessions":[]}'

@@ -20,7 +20,7 @@ function Welcome({ onNew }: { onNew(): void }) {
     <div className="welcome">
       <h1>Meeting notes that write themselves</h1>
       <ol>
-        <li>Start a meeting and hit record. SteveNola listens to your mic and the call audio, only while recording.</li>
+        <li>Start a meeting and hit record. Heard listens to your mic and the call audio, only while recording.</li>
         <li>Jot quick notes as you go. The live transcript fills in on the right.</li>
         <li>Click Enhance notes and your AI turns your notes plus the transcript into clean meeting notes.</li>
       </ol>

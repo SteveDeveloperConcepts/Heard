@@ -526,7 +526,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                   <span>
                     Show the transcript while recording
                     <span className="hint">
-                      When off, SteveNola still transcribes as you go, but the transcript appears only when you stop recording.
+                      When off, Heard still transcribes as you go, but the transcript appears only when you stop recording.
                     </span>
                   </span>
                 </label>
@@ -565,7 +565,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                       <option value="screencapturekit">ScreenCaptureKit (default)</option>
                       <option value="coreaudio-tap">Core Audio tap (macOS 14.2+)</option>
                     </select>
-                    {restartNeeded && <span className="hint">Takes effect after you restart SteveNola.</span>}
+                    {restartNeeded && <span className="hint">Takes effect after you restart Heard.</span>}
                   </div>
                 )}
                 {permissions && (
@@ -611,7 +611,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
               <section className="stack">
                 <SectionHeading
                   title="Calls"
-                  detail="SteveNola can notice when WhatsApp, Zoom, Teams, Slack, Discord, FaceTime, Skype or Webex starts a call, or a Google Meet, Teams, Zoom or Webex call starts in your browser, and ask whether to record. It only checks which apps use the mic, and, while a browser does, the titles of open windows; it hears nothing until you say yes."
+                  detail="Heard can notice when WhatsApp, Zoom, Teams, Slack, Discord, FaceTime, Skype or Webex starts a call, or a Google Meet, Teams, Zoom or Webex call starts in your browser, and ask whether to record. It only checks which apps use the mic, and, while a browser does, the titles of open windows; it hears nothing until you say yes."
                 />
                 <label className="checkbox">
                   <input type="checkbox" checked={callDetection} onChange={(e) => setCallDetection(e.target.checked)} />
@@ -640,7 +640,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                   <span>
                     Keep running when you close the window
                     <span className="hint">
-                      SteveNola stays in the {isMac ? 'menu bar' : 'tray'} and keeps watching for calls. Quit from its{' '}
+                      Heard stays in the {isMac ? 'menu bar' : 'tray'} and keeps watching for calls. Quit from its{' '}
                       {isMac ? 'menu bar' : 'tray'} icon.
                     </span>
                   </span>
@@ -653,7 +653,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                     onChange={(e) => setOpenAtLogin(e.target.checked)}
                   />
                   <span>
-                    Start SteveNola when you log in
+                    Start Heard when you log in
                     <span className="hint">
                       {settings.openAtLoginAvailable
                         ? `It starts in the ${isMac ? 'menu bar' : 'tray'}, ready for your first call.`
@@ -696,7 +696,7 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
               <section className="stack">
                 <SectionHeading title="Privacy and data" />
                 <p className="prose">
-                  SteveNola opens your microphone and system audio only while a recording is running; the app refuses them at any other
+                  Heard opens your microphone and system audio only while a recording is running; the app refuses them at any other
                   time, and the tray icon turns red while it listens. Audio is never saved: built-in transcription processes it on
                   this computer (with Deepgram selected, it streams there instead). Transcripts and notes stay on this computer and
                   go to your AI provider only when you click Enhance or ask a question.

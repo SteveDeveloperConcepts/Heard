@@ -56,7 +56,7 @@ class CallDetector extends EventEmitter<DetectorEvents> {
     return this.timer !== null || this.helper !== null
   }
 
-  /** Whether "ended" events can be trusted while SteveNola itself is using the mic. */
+  /** Whether "ended" events can be trusted while Heard itself is using the mic. */
   get knowsWhichApp(): boolean {
     return this.perApp
   }

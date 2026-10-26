@@ -23,7 +23,7 @@ function describeStartError(err: unknown): string {
   if (err instanceof DOMException) {
     if (err.name === 'NotAllowedError') {
       return window.api.platform === 'darwin'
-        ? 'Microphone access is off for SteveNola. Allow it in System Settings → Privacy & Security → Microphone.'
+        ? 'Microphone access is off for Heard. Allow it in System Settings → Privacy & Security → Microphone.'
         : 'Microphone access was blocked. On Windows, check Settings → Privacy & security → Microphone (desktop apps must be allowed).'
     }
     if (err.name === 'NotFoundError') return 'No microphone was found.'

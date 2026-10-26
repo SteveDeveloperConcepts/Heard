@@ -114,6 +114,20 @@ export function getSecret(name: SecretName): string | null {
   return (env && process.env[env]?.trim()) || null
 }
 
+/** Drops stored keys that can no longer be decrypted, so Settings asks for them again. */
+export function forgetUnreadableSecrets(): void {
+  const current = loadSettings()
+  const secrets = { ...current.secrets }
+  for (const name of Object.keys(secrets) as SecretName[]) {
+    try {
+      safeStorage.decryptString(Buffer.from(secrets[name]!, 'base64'))
+    } catch {
+      delete secrets[name]
+    }
+  }
+  if (Object.keys(secrets).length < Object.keys(current.secrets).length) save({ ...current, secrets })
+}
+
 function keyStatus(name: SecretName): KeyStatus {
   if (loadSettings().secrets[name]) return 'stored'
   const env = envVar(name)

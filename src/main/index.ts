@@ -4,11 +4,14 @@ import { setupCallDetection, stopCallDetection } from './calls'
 import { flushMeetings } from './meetings'
 import { configureMediaAccess, enableMacSystemAudio } from './media'
 import { registerIpc } from './ipc'
+import { finishLegacyDataMove, moveLegacyData } from './legacy-data'
 import { recorder } from './recorder'
 import { loadSettings } from './settings'
 import { startedAtLogin } from './startup'
 import { whisperEngine } from './transcription/whisper-engine'
 import { createTray } from './tray'
+
+moveLegacyData()
 
 // Feature switches must be set before the app is ready.
 enableMacSystemAudio(loadSettings().macAudioBackend)
@@ -45,7 +48,7 @@ function createWindow({ visible = true } = {}): void {
     minWidth: 900,
     minHeight: 560,
     show: false,
-    title: 'SteveNola',
+    title: 'Heard',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: true,
     // Installed builds take the icon from the app itself; `npm run dev` would show Electron's.
@@ -70,7 +73,7 @@ function createWindow({ visible = true } = {}): void {
   win.webContents.on('will-navigate', (event) => event.preventDefault())
 
   // Closing the window hides it instead: always mid-meeting, so recording continues, and otherwise
-  // when the user wants SteveNola kept in the tray to catch calls. Either way it says so.
+  // when the user wants Heard kept in the tray to catch calls. Either way it says so.
   win.on('close', (event) => {
     if (quitting) return
     const recording = recorder.isActive()
@@ -84,10 +87,10 @@ function createWindow({ visible = true } = {}): void {
       win.hide()
     }
     if (recording) {
-      notify('SteveNola is still recording', 'Stop it from the tray icon, or reopen the window.')
+      notify('Heard is still recording', 'Stop it from the tray icon, or reopen the window.')
     } else if (!toldAboutTray) {
       toldAboutTray = true
-      notify('SteveNola is still running', 'It keeps watching for calls from the tray. Quit from the tray icon.')
+      notify('Heard is still running', 'It keeps watching for calls from the tray. Quit from the tray icon.')
     }
   })
   win.on('closed', () => {
@@ -109,6 +112,7 @@ if (!app.requestSingleInstanceLock()) {
     // development the Electron binary's own path is the one Windows knows.
     if (process.platform === 'win32') app.setAppUserModelId(app.isPackaged ? 'com.developerconcepts.stevenola' : process.execPath)
     if (!app.isPackaged) app.dock?.setIcon(devIcon())
+    finishLegacyDataMove()
     registerIpc()
     // Started at login: wait in the tray (the hidden window still hears about calls).
     createWindow({ visible: !startedAtLogin() })
@@ -122,7 +126,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   // Finish the recording (and its last transcript results, also for one just stopped) before
-  // exiting. Its summary is written the next time SteveNola starts.
+  // exiting. Its summary is written the next time Heard starts.
   app.on('before-quit', (event) => {
     quitting = true
     if (!recorder.isActive() && !recorder.isFinishing()) return

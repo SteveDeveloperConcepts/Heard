@@ -21,7 +21,7 @@ import type {
 type Unsubscribe = () => void
 
 /** The API the preload script exposes to the renderer as `window.api`. */
-export interface SteveNolaApi {
+export interface HeardApi {
   platform: string
   meetings: {
     list(): Promise<MeetingSummary[]>

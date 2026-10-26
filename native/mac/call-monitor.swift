@@ -1,4 +1,4 @@
-// SteveNola call monitor: reports which apps are using audio input so the app can offer to record
+// Heard call monitor: reports which apps are using audio input so the app can offer to record
 // calls. It reads Core Audio metadata only; it never opens a device or touches audio.
 //
 // Prints one JSON line whenever the answer changes:
@@ -85,7 +85,7 @@ func jsonLine(_ object: [String: Any]) -> String {
 
 var lastLine = ""
 while true {
-  // Exit if SteveNola went away without stopping us.
+  // Exit if Heard went away without stopping us.
   if getppid() == 1 { exit(0) }
 
   let line: String

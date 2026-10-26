@@ -22,7 +22,8 @@ interface Props {
 type Status = { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; message: string } | { kind: 'error'; message: string }
 
 // Remembered per meeting so a second send goes to the same people. Browser storage is fine here:
-// it's a convenience, and the meeting works without it.
+// it's a convenience, and the meeting works without it. The key keeps the app's old name so
+// recipients saved before the rename are still found.
 function recipientsKey(meetingId: string): string {
   return `stevenola:recipients:${meetingId}`
 }

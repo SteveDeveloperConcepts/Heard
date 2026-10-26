@@ -1,5 +1,7 @@
+# The app was called SteveNola. The ID keeps that name so the Windows installer upgrades an
+# installed SteveNola in place and its "start at login" entry and notifications keep working.
 appId: com.developerconcepts.stevenola
-productName: SteveNola
+productName: Heard
 copyright: Copyright © 2026 Steve Vaubell
 directories:
   buildResources: build
@@ -34,8 +36,8 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
-  shortcutName: SteveNola
-  artifactName: SteveNola-Setup-${version}.${ext}
+  shortcutName: Heard
+  artifactName: Heard-Setup-${version}.${ext}
 
 mac:
   category: public.app-category.productivity
@@ -56,8 +58,8 @@ mac:
       to: call-monitor
   # macOS shows these strings in its permission prompts.
   extendInfo:
-    NSMicrophoneUsageDescription: SteveNola transcribes your side of a meeting, only while you are recording.
-    NSAudioCaptureUsageDescription: SteveNola transcribes the other participants' audio, only while you are recording.
+    NSMicrophoneUsageDescription: Heard transcribes your side of a meeting, only while you are recording.
+    NSAudioCaptureUsageDescription: Heard transcribes the other participants' audio, only while you are recording.
   notarize: false
 dmg:
-  artifactName: SteveNola-${version}-${arch}.${ext}
+  artifactName: Heard-${version}-${arch}.${ext}

@@ -1,17 +1,19 @@
-# SteveNola
+# Heard
 
-AI meeting notes for macOS and Windows. Hit record, jot quick notes, and SteveNola transcribes your mic and the call audio live, on your own computer, with no transcription account needed. When you stop recording, your chosen AI turns your notes plus the transcript into clean meeting notes that open with a summary, and gives the meeting a title. You can also ask questions about any meeting.
+AI meeting notes for macOS and Windows. Hit record, jot quick notes, and Heard transcribes your mic and the call audio live, on your own computer, with no transcription account needed. When you stop recording, your chosen AI turns your notes plus the transcript into clean meeting notes that open with a summary, and gives the meeting a title. You can also ask questions about any meeting.
 
 ## Install and run
 
 ### Download
 
-Get the latest installer from [Releases](https://github.com/SteveDeveloperConcepts/SteveNola/releases/latest):
+Get the latest installer from [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases/latest):
 
-- **Windows 10 or 11:** `SteveNola-Setup-<version>.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
-- **macOS 13 or later on Apple Silicon (M1 or newer):** `SteveNola-<version>-arm64.dmg`. Open it and drag SteveNola to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
+- **Windows 10 or 11:** `Heard-Setup-<version>.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
+- **macOS 13 or later on Apple Silicon (M1 or newer):** `Heard-<version>-arm64.dmg`. Open it and drag Heard to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
 
 Then see [First launch](#first-launch). To run from the source code instead, read on.
+
+**Coming from SteveNola?** Heard is the same app under a new name. Quit SteveNola from its tray icon first. The first time Heard starts, it moves your meetings, settings and speech model over from SteveNola. On Windows, the installer replaces SteveNola. On a Mac, move SteveNola to the Trash, then enter your API keys again in Settings (macOS keeps them under the app's old name), and allow microphone and screen recording again if asked.
 
 ### What you need
 
@@ -23,30 +25,30 @@ Then see [First launch](#first-launch). To run from the source code instead, rea
 
 ### Run it
 
-Open a terminal in the SteveNola folder (PowerShell on Windows, Terminal on a Mac) and install the dependencies. This also downloads Electron:
+Open a terminal in the Heard folder (PowerShell on Windows, Terminal on a Mac) and install the dependencies. This also downloads Electron:
 
 ```bash
 npm install
 ```
 
-On a Mac, build the call-detection helper once. Without it, SteveNola works but won't notice WhatsApp and other calls:
+On a Mac, build the call-detection helper once. Without it, Heard works but won't notice WhatsApp and other calls:
 
 ```bash
 npm run helper:mac
 ```
 
-Start SteveNola:
+Start Heard:
 
 ```bash
 npm run dev
 ```
 
-The window opens after a few seconds, and code changes reload automatically. Closing the window leaves SteveNola running in the tray (the menu bar on a Mac) so it can catch calls. To quit, choose **Quit** from the tray icon's menu, or press Ctrl+C in the terminal.
+The window opens after a few seconds, and code changes reload automatically. Closing the window leaves Heard running in the tray (the menu bar on a Mac) so it can catch calls. To quit, choose **Quit** from the tray icon's menu, or press Ctrl+C in the terminal.
 
 ### First launch
 
 1. **Pick your AI.** In Settings → AI for notes and questions, choose a provider and paste its API key (Claude is the default). Choose Ollama to run without a key. Recording and transcripts work without an AI; only the summary, Enhance and Ask need one.
-2. **Record.** Click **Start recording**. The first time, SteveNola downloads the speech model (about 130 MB) and shows progress in the recording bar. To download it in advance, use Settings → Transcription → **Download now**.
+2. **Record.** Click **Start recording**. The first time, Heard downloads the speech model (about 130 MB) and shows progress in the recording bar. To download it in advance, use Settings → Transcription → **Download now**.
 3. **Allow access.** Allow microphone access when asked. On a Mac, also allow **Screen & System Audio Recording**, so the other side of a call is captured (see [Permissions](#permissions)).
 4. **Gmail (optional).** If you're signed in to several Google accounts, pick the one to send from in Settings → Sharing.
 
@@ -60,7 +62,7 @@ Build the installer on the kind of computer it's for: the Windows installer on W
 npm run dist:win
 ```
 
-This makes `dist\SteveNola-Setup-0.1.0.exe`. Run it and follow the steps; SteveNola then appears in the Start menu. The installer isn't code-signed, so Windows SmartScreen may say "Windows protected your PC". Click **More info**, then **Run anyway**.
+This makes `dist\Heard-Setup-0.1.0.exe`. Run it and follow the steps; Heard then appears in the Start menu. The installer isn't code-signed, so Windows SmartScreen may say "Windows protected your PC". Click **More info**, then **Run anyway**.
 
 **macOS:**
 
@@ -68,7 +70,7 @@ This makes `dist\SteveNola-Setup-0.1.0.exe`. Run it and follow the steps; SteveN
 npm run dist:mac
 ```
 
-This also builds the call-detection helper, and makes `dist/SteveNola-0.1.0-arm64.dmg`. Open it and drag SteveNola to Applications. The app isn't signed by Apple. If macOS says it can't be opened, go to System Settings → Privacy & Security and click **Open Anyway**.
+This also builds the call-detection helper, and makes `dist/Heard-0.1.0-arm64.dmg`. Open it and drag Heard to Applications. The app isn't signed by Apple. If macOS says it can't be opened, go to System Settings → Privacy & Security and click **Open Anyway**.
 
 The installed app uses the same data folder as `npm run dev`, so your meetings, settings and downloaded speech model carry over.
 
@@ -79,7 +81,7 @@ The Mac app is only ad-hoc signed, so other people have to use **Open Anyway** t
 - **`Error: Electron uninstall` when starting:** Electron's download didn't finish. Run `node node_modules/electron/install.js`, then `npm run dev` again.
 - **Errors that mention the Node.js version:** install the current Node.js LTS from https://nodejs.org, then run `npm install` again.
 - **The speech model won't download:** the first recording needs internet access to huggingface.co. Once you're online, use Settings → Transcription → **Download now**.
-- **No "Them" lines during a call:** check that system audio capture is on in Settings → Audio. On a Mac, also allow Screen & System Audio Recording, then restart SteveNola.
+- **No "Them" lines during a call:** check that system audio capture is on in Settings → Audio. On a Mac, also allow Screen & System Audio Recording, then restart Heard.
 
 ## How it works
 
@@ -99,7 +101,7 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 - **Listens only while recording.** The main process refuses every microphone and system-audio request unless a recording is armed ([src/main/media.ts](src/main/media.ts)). Stopping releases the devices, closes the transcription streams and disarms capture. While recording, the tray icon is a red dot (a hollow ring otherwise). Closing the window mid-meeting keeps recording, and a notification tells you so.
 - **System audio without drivers.** Windows uses WASAPI loopback through Chromium. macOS 13+ uses ScreenCaptureKit (or a Core Audio tap on 14.2+), turned on with Chromium feature switches. In both cases the app asks for display media, keeps the audio track and throws the video away.
 - **Your notes drive the AI notes.** Enhance sends your typed notes, the transcript and a structure template (General, 1:1, Customer call, Standup, Interview) to the AI. Every structure opens with a short summary. Prompts are in [src/main/ai/prompts.ts](src/main/ai/prompts.ts).
-- **A summary and title when the meeting ends.** When a recording stops (the Stop button, the tray, or the call ending), SteveNola writes the notes in the background, even with the window closed, and they stream into the Enhanced tab. It then asks the AI for a short title, used only if the meeting is untitled, still named after its call ("WhatsApp call"), or was named by the AI earlier. It skips recordings with only a few words, and if you record more later it rewrites the notes and title to cover the whole meeting. Notes you've edited by hand are never replaced, and a title you've typed is never changed. If SteveNola quits before the summary is written, it finishes it the next time it starts. Turn it off in Settings → AI ([src/main/ai/index.ts](src/main/ai/index.ts)).
+- **A summary and title when the meeting ends.** When a recording stops (the Stop button, the tray, or the call ending), Heard writes the notes in the background, even with the window closed, and they stream into the Enhanced tab. It then asks the AI for a short title, used only if the meeting is untitled, still named after its call ("WhatsApp call"), or was named by the AI earlier. It skips recordings with only a few words, and if you record more later it rewrites the notes and title to cover the whole meeting. Notes you've edited by hand are never replaced, and a title you've typed is never changed. If Heard quits before the summary is written, it finishes it the next time it starts. Turn it off in Settings → AI ([src/main/ai/index.ts](src/main/ai/index.ts)).
 - **Local storage.** Meetings are JSON files in the app's data folder (Settings → Privacy → Open data folder). Audio is never written to disk. API keys are saved as soon as you paste them and encrypted with Electron's `safeStorage`: Windows data protection (DPAPI, tied to your Windows account) or the macOS Keychain. They're never stored as plain text, shown again, or sent anywhere except to that provider.
 
 ## Share notes by email (Gmail)
@@ -114,15 +116,15 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 
 ## Call detection
 
-When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, or a Google Meet, Teams, Zoom or Webex call starts in your browser, SteveNola shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches), and the summary and a better title are written.
+When WhatsApp, Zoom, Microsoft Teams, Slack, Discord, FaceTime, Skype or Webex starts using your microphone, or a Google Meet, Teams, Zoom or Webex call starts in your browser, Heard shows a notification and a banner: **"WhatsApp call in progress. Record call / Not now."** It never records without that yes. Choosing Record creates a "WhatsApp call" meeting and starts recording. When the call ends, recording stops (Settings → Calls has both switches), and the summary and a better title are written.
 
-SteveNola has to be running to notice calls. Closing the window leaves it in the tray (the menu bar on a Mac), and the installed app can start there when you log in (Settings → Calls).
+Heard has to be running to notice calls. Closing the window leaves it in the tray (the menu bar on a Mac), and the installed app can start there when you log in (Settings → Calls).
 
 Detection reads which apps are using the mic, never audio ([src/main/calls/](src/main/calls)):
 
-- **Windows:** a small PowerShell script ([native/win/call-monitor.ps1](native/win/call-monitor.ps1)) reads Core Audio's list of audio sessions, the same list the volume mixer shows, every 1.5 seconds, and reports which programs are capturing from a microphone. WhatsApp and the new Teams capture in a WebView2 helper process, so the script also reports each program's parent processes. As a fallback SteveNola also reads the per-app microphone usage that Windows keeps in the registry, which some Windows 11 builds stopped updating. Works for Microsoft Store apps and desktop apps alike.
+- **Windows:** a small PowerShell script ([native/win/call-monitor.ps1](native/win/call-monitor.ps1)) reads Core Audio's list of audio sessions, the same list the volume mixer shows, every 1.5 seconds, and reports which programs are capturing from a microphone. WhatsApp and the new Teams capture in a WebView2 helper process, so the script also reports each program's parent processes. As a fallback Heard also reads the per-app microphone usage that Windows keeps in the registry, which some Windows 11 builds stopped updating. Works for Microsoft Store apps and desktop apps alike.
 - **macOS:** a small Swift helper ([native/mac/call-monitor.swift](native/mac/call-monitor.swift)) reads Core Audio's per-process input state (macOS 14.2+). On macOS 13–14.1 it can only tell that *some* app is using the mic, so it assumes a running call app is the one. In that mode the recording can't stop itself when the call ends, and browser calls aren't detected. `npm run dist:mac` builds the helper; for `npm run dev` on a Mac, run `npm run helper:mac` once first.
-- **Browser calls:** a browser using the mic could be doing anything, so SteveNola then checks the titles of open windows. A browser window's title is its current tab ("Meet - abc-defg-hij - Google Chrome"). Titles are only read while a browser holds the mic, only checked for a call, and never saved or sent anywhere. Once found, the call lasts until the browser lets go of the mic, so switching tabs doesn't end it. The Meet tab must be the visible tab of a window that isn't minimized when the call starts, or when you switch back to it. A Meet window's title is unique, so Meet is also found in the installed Meet app and on a Mac. Teams, Zoom and Webex windows look the same as their desktop apps', so those web calls are only recognised in a Windows browser window. On a Mac, reading window titles needs the Screen & System Audio Recording permission.
+- **Browser calls:** a browser using the mic could be doing anything, so Heard then checks the titles of open windows. A browser window's title is its current tab ("Meet - abc-defg-hij - Google Chrome"). Titles are only read while a browser holds the mic, only checked for a call, and never saved or sent anywhere. Once found, the call lasts until the browser lets go of the mic, so switching tabs doesn't end it. The Meet tab must be the visible tab of a window that isn't minimized when the call starts, or when you switch back to it. A Meet window's title is unique, so Meet is also found in the installed Meet app and on a Mac. Teams, Zoom and Webex windows look the same as their desktop apps', so those web calls are only recognised in a Windows browser window. On a Mac, reading window titles needs the Screen & System Audio Recording permission.
 
 Recording laws differ by country and state. Some require everyone's consent, so the prompt reminds you to tell people you're recording.
 
@@ -146,12 +148,12 @@ Claude goes through the official `@anthropic-ai/sdk`, with prompt caching on the
 Built in by default: OpenAI's open Whisper speech-recognition model runs on your computer through Transformers.js and ONNX Runtime ([src/main/transcription/](src/main/transcription)). No account or key is needed, and audio never leaves the machine.
 
 - **How it works:** each source's audio is cut into utterances at pauses ([segmenter.ts](src/main/transcription/segmenter.ts)), and each utterance is transcribed in a separate utility process, so the app never freezes. While someone is mid-sentence, a rough partial result shows with animated dots. It's replaced by the final text when they pause.
-- **Model download:** on your first recording, SteveNola downloads the model from Hugging Face (about 130 MB) and keeps it in the app's data folder; after that it works offline. Settings → Transcription → **Download now** fetches it in advance.
+- **Model download:** on your first recording, Heard downloads the model from Hugging Face (about 130 MB) and keeps it in the app's data folder; after that it works offline. Settings → Transcription → **Download now** fetches it in advance.
 - **Model sizes:** Fastest (tiny), Balanced (base, default) and Most accurate (small). English uses the English-only models, which are more accurate.
 - **Speed:** measured on the development PC, the Balanced model took about 1 second per spoken sentence, faster than real time. If a slow computer falls behind, the recording bar says so and the transcript catches up.
 - **Deepgram:** still available as an optional cloud engine in Settings → Transcription. It needs an API key, or `DEEPGRAM_API_KEY`.
 
-While recording, the **Me** and **Them** chips in the recording bar and at the top of the transcript move with each voice and glow green while that person is talking, so you can see it's hearing both sides. SteveNola transcribes as you go, but by default the transcript only appears when you stop recording; Settings → Transcription → **Show the transcript while recording** shows it live.
+While recording, the **Me** and **Them** chips in the recording bar and at the top of the transcript move with each voice and glow green while that person is talking, so you can see it's hearing both sides. Heard transcribes as you go, but by default the transcript only appears when you stop recording; Settings → Transcription → **Show the transcript while recording** shows it live.
 
 ## Develop
 
@@ -175,7 +177,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-About 10 minutes later, the Windows and Mac installers appear on the [Releases](https://github.com/SteveDeveloperConcepts/SteveNola/releases) page. To test the builds without releasing, run the **Release** workflow by hand from the Actions tab; its installers are attached to the run.
+About 10 minutes later, the Windows and Mac installers appear on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page. To test the builds without releasing, run the **Release** workflow by hand from the Actions tab; its installers are attached to the run.
 
 ## Permissions
 
@@ -184,7 +186,7 @@ About 10 minutes later, the Windows and Mac installers appear on the [Releases](
 
 ## Design
 
-The screens follow the **SteveNola Screens** design canvas: https://claude.ai/artifact/73Y38mAGeuAWi2iGGZF2aJ (recording, enhanced notes and the Share menu, the Gmail dialog, Settings, and the call prompt). Colors and components in [src/renderer/src/styles.css](src/renderer/src/styles.css) match it.
+The screens follow the design canvas at https://claude.ai/artifact/73Y38mAGeuAWi2iGGZF2aJ (recording, enhanced notes and the Share menu, the Gmail dialog, Settings, and the call prompt). Colors and components in [src/renderer/src/styles.css](src/renderer/src/styles.css) match it.
 
 ## Known limitations
 

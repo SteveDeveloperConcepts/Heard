@@ -47,13 +47,13 @@ export function createTray(showWindow: () => void): Tray {
 
   const update = (state: RecordingState): void => {
     tray.setImage(icon(state.active))
-    tray.setToolTip(state.active ? 'SteveNola: recording' : 'SteveNola: not recording')
+    tray.setToolTip(state.active ? 'Heard: recording' : 'Heard: not recording')
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: state.active ? 'Recording…' : 'Not recording', enabled: false },
         ...(state.active ? [{ label: 'Stop recording', click: () => void recorder.stop() }] : []),
         { type: 'separator' },
-        { label: 'Open SteveNola', click: showWindow },
+        { label: 'Open Heard', click: showWindow },
         { label: 'Quit', role: 'quit' }
       ])
     )

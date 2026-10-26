@@ -1,8 +1,8 @@
-import type { SteveNolaApi } from '../../shared/api'
+import type { HeardApi } from '../../shared/api'
 
 declare global {
   interface Window {
-    api: SteveNolaApi
+    api: HeardApi
   }
 }
 

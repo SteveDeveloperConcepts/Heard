@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { SteveNolaApi } from '../shared/api'
+import type { HeardApi } from '../shared/api'
 import { IPC } from '../shared/ipc'
 
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
@@ -10,7 +10,7 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
   }
 }
 
-const api: SteveNolaApi = {
+const api: HeardApi = {
   platform: process.platform,
   meetings: {
     list: () => ipcRenderer.invoke(IPC.meetingsList),

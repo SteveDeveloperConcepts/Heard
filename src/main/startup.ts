@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { loadSettings } from './settings'
 
-// Starting at login lets SteveNola catch calls all day. It starts out of sight, in the tray.
+// Starting at login lets Heard catch calls all day. It starts out of sight, in the tray.
 
 /** Windows passes this to the login item; macOS reports a login launch itself. */
 const LOGIN_ARG = '--hidden'

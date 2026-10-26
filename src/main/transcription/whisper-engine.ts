@@ -87,7 +87,7 @@ class WhisperEngine extends EventEmitter<EngineEvents> {
   private ensureWorker(): UtilityProcess {
     if (this.worker) return this.worker
     const worker = utilityProcess.fork(join(__dirname, 'whisper-worker.js'), [], {
-      serviceName: 'SteveNola speech recognition'
+      serviceName: 'Heard speech recognition'
     })
     worker.on('message', (message: WorkerResponse) => this.onMessage(message))
     worker.on('exit', (code) => {

@@ -49,7 +49,7 @@ export function activeMicEntries(): Promise<string[]> {
 
 /**
  * Core Audio's view (see native/win/call-monitor.ps1): for each process capturing from a microphone,
- * its exe path followed by its parents' (SteveNola itself is left out).
+ * its exe path followed by its parents' (Heard itself is left out).
  */
 export interface WindowsMicReport {
   sessions: string[][]
@@ -61,7 +61,7 @@ function monitorScriptPath(): string {
 
 /**
  * Starts the script that reports which processes capture from a microphone. It prints a report
- * whenever that changes, and quits by itself if SteveNola does. Returns null when it can't start.
+ * whenever that changes, and quits by itself if Heard does. Returns null when it can't start.
  */
 export function startWindowsMonitor(onReport: (report: WindowsMicReport) => void, onExit: () => void): ChildProcess | null {
   const script = monitorScriptPath()
@@ -73,11 +73,11 @@ export function startWindowsMonitor(onReport: (report: WindowsMicReport) => void
   // Run as a script block read from the file: an execution policy set by Group Policy blocks
   // unsigned script files, but not script blocks. The path goes in an environment variable, so
   // no quoting can break it.
-  const command = `& ([scriptblock]::Create([IO.File]::ReadAllText($env:STEVENOLA_CALL_MONITOR))) -OwnerPid ${process.pid}`
+  const command = `& ([scriptblock]::Create([IO.File]::ReadAllText($env:HEARD_CALL_MONITOR))) -OwnerPid ${process.pid}`
   const child = spawn(powershell, ['-NoProfile', '-NonInteractive', '-MTA', '-Command', command], {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
-    env: { ...process.env, STEVENOLA_CALL_MONITOR: script }
+    env: { ...process.env, HEARD_CALL_MONITOR: script }
   })
   createInterface({ input: child.stdout! }).on('line', (line) => {
     try {

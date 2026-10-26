@@ -99,9 +99,9 @@ export interface Settings {
   stopWhenCallEnds: boolean
   /** Show the transcript as it's written; otherwise it appears when recording stops. */
   liveTranscript: boolean
-  /** Closing the window leaves SteveNola running in the tray, still watching for calls. */
+  /** Closing the window leaves Heard running in the tray, still watching for calls. */
   keepInTray: boolean
-  /** Start SteveNola, in the tray, when the user logs in. */
+  /** Start Heard, in the tray, when the user logs in. */
   openAtLogin: boolean
   /** False when running from source, which can't register itself to start at login. */
   openAtLoginAvailable: boolean

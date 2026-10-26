@@ -129,7 +129,7 @@ export function Sidebar({ meetings, selectedId, recording, onSelect, onRename, o
       <div className="sidebar-header drag">
         <span className="brand">
           <BrandMark />
-          SteveNola
+          Heard
         </span>
       </div>
 

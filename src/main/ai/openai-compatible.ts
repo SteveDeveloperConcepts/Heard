@@ -10,7 +10,7 @@ import type { AiClient } from './types'
 function headers(config: AiConfig): Record<string, string> {
   const result: Record<string, string> = { 'Content-Type': 'application/json' }
   if (config.apiKey) result.Authorization = `Bearer ${config.apiKey}`
-  if (config.provider === 'openrouter') result['X-Title'] = 'SteveNola'
+  if (config.provider === 'openrouter') result['X-Title'] = 'Heard'
   return result
 }
 

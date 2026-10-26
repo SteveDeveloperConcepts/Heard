@@ -1,6 +1,6 @@
 {
-  "name": "stevenola",
-  "productName": "SteveNola",
+  "name": "heard",
+  "productName": "Heard",
   "version": "0.1.2",
   "description": "AI meeting notes: records mic + system audio only while you ask it to, transcribes live, and turns your notes into polished meeting notes with Claude.",
   "main": "./out/main/index.js",
