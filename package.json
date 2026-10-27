@@ -1,7 +1,7 @@
 {
   "name": "heard",
   "productName": "Heard",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "AI meeting notes: records mic + system audio only while you ask it to, transcribes live, and turns your notes into polished meeting notes with Claude.",
   "main": "./out/main/index.js",
   "author": "Steve Vaubell",
