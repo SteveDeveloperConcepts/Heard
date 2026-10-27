@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { aiSetupProblem } from '../../shared/providers'
-import type { CallInfo, MeetingSummary, Settings } from '../../shared/types'
+import type { CallInfo, MeetingSummary, Settings, UpdateState } from '../../shared/types'
 import { CallBanner } from './components/CallBanner'
 import { Icon } from './components/Icon'
 import { MeetingView } from './components/MeetingView'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Sidebar } from './components/Sidebar'
+import { UpdateBanner } from './components/UpdateBanner'
 import { useRecording } from './hooks/useRecording'
+import { cleanIpcError } from './lib/format'
 
 function setupProblem(s: Settings): string | null {
   if (s.transcriptionEngine === 'deepgram' && s.deepgramKey === 'none') {
@@ -116,6 +118,15 @@ export function App() {
     })
   }, [recordCall])
 
+  // The update may have been found before this window loaded, so ask as well as listen.
+  const [update, setUpdate] = useState<UpdateState | null>(null)
+  /** The version put off with "Later". A newer one shows again. */
+  const [updateLater, setUpdateLater] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.update.state().then((state) => setUpdate((current) => current ?? state))
+    return window.api.update.onState(setUpdate)
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return
@@ -155,6 +166,14 @@ export function App() {
               Open settings
             </button>
           </div>
+        )}
+        {update && update.version !== updateLater && (
+          <UpdateBanner
+            update={update}
+            recording={recording.state.active}
+            onLater={() => setUpdateLater(update.version)}
+            onInstall={() => void window.api.update.install().catch((err: unknown) => window.alert(cleanIpcError(err)))}
+          />
         )}
         {selectedId ? (
           <MeetingView

@@ -223,3 +223,13 @@ export interface PermissionStatus {
   /** macOS screen & system audio recording permission; 'granted' elsewhere. */
   screen: MediaAccess
 }
+
+/**
+ * A newer Heard on GitHub. `ready`: downloaded, and installed when Heard restarts or quits (Windows).
+ * `available`: the user downloads it from its release page (macOS, until the app is signed with a
+ * Developer ID).
+ */
+export interface UpdateState {
+  kind: 'ready' | 'available'
+  version: string
+}

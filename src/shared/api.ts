@@ -15,7 +15,8 @@ import type {
   SettingsUpdate,
   ShareResult,
   TranscriberStatus,
-  TranscriptEvent
+  TranscriptEvent,
+  UpdateState
 } from './types'
 
 type Unsubscribe = () => void
@@ -78,6 +79,13 @@ export interface HeardApi {
     copy(content: { text: string; html?: string }): Promise<void>
     /** Opens a Gmail draft in the browser. Nothing is sent until the user presses Send there. */
     openGmail(draft: GmailDraft): Promise<ShareResult>
+  }
+  update: {
+    /** The newer version found since Heard started, or null. */
+    state(): Promise<UpdateState | null>
+    onState(cb: (state: UpdateState) => void): Unsubscribe
+    /** `ready`: quit and install it now (refused while recording). `available`: open its release page. */
+    install(): Promise<void>
   }
   openDataFolder(): Promise<void>
 }

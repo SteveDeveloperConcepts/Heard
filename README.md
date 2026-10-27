@@ -11,6 +11,8 @@ Get the latest installer from [Releases](https://github.com/SteveDeveloperConcep
 - **Windows 10 or 11:** `Heard-Setup-<version>.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
 - **macOS 13 or later on Apple Silicon (M1 or newer):** `Heard-<version>-arm64.dmg`. Open it and drag Heard to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
 
+Once installed, Heard looks for new versions itself. On Windows it downloads them in the background and installs them when you restart it: choose **Restart now** in the banner or **Restart to update** in the tray menu, or it installs the next time you quit Heard. It never restarts while you're recording. On a Mac it tells you when there's a new version, and **Download** opens its release page. Versions 0.1.3 and earlier don't check, so install the version after them by hand.
+
 Then see [First launch](#first-launch). To run from the source code instead, read on.
 
 **Coming from SteveNola?** Heard is the same app under a new name. Quit SteveNola from its tray icon first. The first time Heard starts, it moves your meetings, settings and speech model over from SteveNola. On Windows, the installer replaces SteveNola. On a Mac, move SteveNola to the Trash, then enter your API keys again in Settings (macOS keeps them under the app's old name), and allow microphone and screen recording again if asked.
@@ -102,6 +104,7 @@ streamed markdown ◀────── ai:event ───  transcript, stream r
 - **System audio without drivers.** Windows uses WASAPI loopback through Chromium. macOS 13+ uses ScreenCaptureKit (or a Core Audio tap on 14.2+), turned on with Chromium feature switches. In both cases the app asks for display media, keeps the audio track and throws the video away.
 - **Your notes drive the AI notes.** Enhance sends your typed notes, the transcript and a structure template (General, 1:1, Customer call, Standup, Interview) to the AI. Every structure opens with a short summary. Prompts are in [src/main/ai/prompts.ts](src/main/ai/prompts.ts).
 - **A summary and title when the meeting ends.** When a recording stops (the Stop button, the tray, or the call ending), Heard writes the notes in the background, even with the window closed, and they stream into the Enhanced tab. It then asks the AI for a short title, used only if the meeting is untitled, still named after its call ("WhatsApp call"), or was named by the AI earlier. It skips recordings with only a few words, and if you record more later it rewrites the notes and title to cover the whole meeting. Notes you've edited by hand are never replaced, and a title you've typed is never changed. If Heard quits before the summary is written, it finishes it the next time it starts. Turn it off in Settings → AI ([src/main/ai/index.ts](src/main/ai/index.ts)).
+- **Update checks.** The installed app asks GitHub for the latest release 10 seconds after it starts and every 4 hours ([src/main/updater.ts](src/main/updater.ts)). The request carries nothing that tells one user from another. Running from source never checks.
 - **Local storage.** Meetings are JSON files in the app's data folder (Settings → Privacy → Open data folder). Audio is never written to disk. API keys are saved as soon as you paste them and encrypted with Electron's `safeStorage`: Windows data protection (DPAPI, tied to your Windows account) or the macOS Keychain. They're never stored as plain text, shown again, or sent anywhere except to that provider.
 
 ## Share notes by email (Gmail)
@@ -178,6 +181,18 @@ git push origin v0.1.0
 ```
 
 About 10 minutes later, the Windows and Mac installers appear on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page. To test the builds without releasing, run the **Release** workflow by hand from the Actions tab; its installers are attached to the run.
+
+**How installed copies get the release.** Next to the installers, the release has `latest.yml` (Windows), `latest-mac.yml` and `.blockmap` files. Installed copies read them to find the new version, and Windows uses the `.blockmap` files to download only what changed. Don't delete them from a release. If you replace an installer on a release, for example with a signed one, replace its `latest*.yml` and `.blockmap` with the ones from the same build too. Installed copies check the download against them and refuse one that doesn't match.
+
+Every published release reaches everyone within a few hours, and you can't take it back from copies that have already updated. If a release is broken, publish a fixed one with a higher version.
+
+**Full updates on macOS.** Mac copies only announce new versions, because macOS only installs updates signed with an Apple Developer ID. Once you have a certificate:
+
+1. Sign and notarise the Mac build: remove `identity: '-'` and set `notarize: true` in [electron-builder.yml](electron-builder.yml), and give the Release workflow the certificate.
+2. Add a `zip` target (arm64) to `mac.target`. Mac updates install from the zip, not the DMG. Add `dist/*.zip` to the files the workflow uploads.
+3. In `updateMode` in [src/main/updater.ts](src/main/updater.ts), return `'install'` for `darwin` too.
+
+Copies with the ad-hoc signature can't install a signed update, so Mac users install the first signed version by hand. The notice tells them it's out.
 
 ## Permissions
 

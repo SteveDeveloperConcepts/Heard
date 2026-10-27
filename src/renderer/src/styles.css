@@ -533,7 +533,8 @@ a:hover {
 /* Banners, toasts */
 
 .setup-banner,
-.call-banner {
+.call-banner,
+.update-banner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -543,7 +544,8 @@ a:hover {
   font-size: 13.5px;
 }
 
-.setup-banner {
+.setup-banner,
+.update-banner {
   background: var(--accent-soft);
 }
 
@@ -562,7 +564,8 @@ a:hover {
   color: #ffffff;
 }
 
-.call-banner-text {
+.call-banner-text,
+.update-banner-text {
   display: flex;
   flex-direction: column;
   flex: 1 1 260px;

@@ -56,6 +56,11 @@ const api: HeardApi = {
     copy: (content) => ipcRenderer.invoke(IPC.shareCopy, content),
     openGmail: (draft) => ipcRenderer.invoke(IPC.shareGmail, draft)
   },
+  update: {
+    state: () => ipcRenderer.invoke(IPC.updateState),
+    onState: (cb) => subscribe(IPC.updateStateChanged, cb),
+    install: () => ipcRenderer.invoke(IPC.updateInstall)
+  },
   openDataFolder: () => ipcRenderer.invoke(IPC.openDataFolder)
 }
 

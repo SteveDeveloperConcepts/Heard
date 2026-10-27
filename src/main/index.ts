@@ -10,6 +10,7 @@ import { loadSettings } from './settings'
 import { startedAtLogin } from './startup'
 import { whisperEngine } from './transcription/whisper-engine'
 import { createTray } from './tray'
+import { updater } from './updater'
 
 moveLegacyData()
 
@@ -118,6 +119,16 @@ if (!app.requestSingleInstanceLock()) {
     createWindow({ visible: !startedAtLogin() })
     tray = createTray(showWindow)
     setupCallDetection(showWindow)
+    // Heard often waits in the tray with its window hidden, where the update banner can't be seen.
+    updater.on('state', (state) => {
+      if (mainWindow?.isVisible()) return
+      if (state.kind === 'ready') {
+        notify(`Heard ${state.version} is ready`, 'It installs when you quit Heard. To install it now, choose Restart to update from the tray icon.')
+      } else {
+        notify(`Heard ${state.version} is available`, 'Choose Download from the Heard icon in the menu bar.')
+      }
+    })
+    updater.start()
     app.on('activate', showWindow)
   })
 

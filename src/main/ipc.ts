@@ -30,6 +30,7 @@ import { applyOpenAtLogin } from './startup'
 import { loadSettings, publicSettings, updateSettings } from './settings'
 import { whisperEngine } from './transcription/whisper-engine'
 import { copyToClipboard, openGmailDraft } from './share'
+import { updater } from './updater'
 
 const SOURCES: readonly AudioSource[] = ['mic', 'system']
 const TEMPLATES: readonly TemplateId[] = ['general', 'one-on-one', 'customer-call', 'standup', 'interview']
@@ -127,6 +128,7 @@ export function registerIpc(): void {
     if (summarize && loadSettings().autoSummary) void summarizeRecording(meetingId, emitAi)
   })
   whisperEngine.on('status', (status) => broadcast(IPC.transcriberStatus, status))
+  updater.on('state', (state) => broadcast(IPC.updateStateChanged, state))
 
   ipcMain.handle(IPC.meetingsList, () => listMeetings())
   ipcMain.handle(IPC.meetingsGet, (_e, id) => getMeeting(asString(id, 'id')))
@@ -185,6 +187,9 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.shareCopy, (_e, content) => copyToClipboard(asShareContent(content)))
   ipcMain.handle(IPC.shareGmail, (_e, draft) => openGmailDraft(asGmailDraft(draft)))
+
+  ipcMain.handle(IPC.updateState, () => updater.state())
+  ipcMain.handle(IPC.updateInstall, () => updater.install())
 
   ipcMain.handle(IPC.openDataFolder, async () => {
     await mkdir(meetingsDir(), { recursive: true })

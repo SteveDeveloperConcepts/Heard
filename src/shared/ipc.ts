@@ -37,5 +37,9 @@ export const IPC = {
   shareCopy: 'share:copy',
   shareGmail: 'share:gmail',
 
+  updateState: 'update:state',
+  updateInstall: 'update:install',
+  updateStateChanged: 'update:state-changed',
+
   openDataFolder: 'app:open-data-folder'
 } as const

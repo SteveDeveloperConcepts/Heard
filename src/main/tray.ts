@@ -1,6 +1,7 @@
-import { Menu, Tray, nativeImage, type NativeImage } from 'electron'
-import type { RecordingState } from '../shared/types'
+import { Menu, Tray, nativeImage, type MenuItemConstructorOptions, type NativeImage } from 'electron'
+import type { RecordingState, UpdateState } from '../shared/types'
 import { recorder } from './recorder'
+import { updater } from './updater'
 
 // The tray icon is the always-visible answer to "is it listening?": a hollow ring when idle,
 // a solid red dot while recording.
@@ -42,10 +43,19 @@ function icon(recording: boolean): NativeImage {
   return image
 }
 
+/** A newer version, for when Heard waits in the tray and its window (with the update banner) is closed. */
+function updateItem(newer: UpdateState, recording: boolean): MenuItemConstructorOptions {
+  return newer.kind === 'ready'
+    ? // Restarting would end the recording.
+      { label: `Restart to update to ${newer.version}`, enabled: !recording, click: () => void updater.install() }
+    : { label: `Download Heard ${newer.version}…`, click: () => void updater.install() }
+}
+
 export function createTray(showWindow: () => void): Tray {
   const tray = new Tray(icon(false))
 
   const update = (state: RecordingState): void => {
+    const newer = updater.state()
     tray.setImage(icon(state.active))
     tray.setToolTip(state.active ? 'Heard: recording' : 'Heard: not recording')
     tray.setContextMenu(
@@ -54,12 +64,14 @@ export function createTray(showWindow: () => void): Tray {
         ...(state.active ? [{ label: 'Stop recording', click: () => void recorder.stop() }] : []),
         { type: 'separator' },
         { label: 'Open Heard', click: showWindow },
+        ...(newer ? [updateItem(newer, state.active)] : []),
         { label: 'Quit', role: 'quit' }
       ])
     )
   }
 
   recorder.on('state', update)
+  updater.on('state', () => update(recorder.state()))
   update(recorder.state())
   if (process.platform !== 'darwin') tray.on('click', showWindow)
   return tray

@@ -17,12 +17,13 @@
     "build": "npm run typecheck && electron-vite build",
     "icons": "node scripts/make-icons.mjs",
     "helper:mac": "node scripts/build-mac-helper.mjs",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && npm run helper:mac && electron-builder --mac"
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build && npm run helper:mac && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
     "@huggingface/transformers": "^4.3.1",
+    "electron-updater": "^6.8.11",
     "ws": "^8.22.0"
   },
   "devDependencies": {

@@ -22,7 +22,13 @@ asarUnpack:
   - '**/node_modules/onnxruntime-node/**'
   - '**/node_modules/sharp/**'
   - '**/node_modules/@img/**'
-publish: null
+# Where installed copies look for new versions (src/main/updater.ts). Builds never upload anything
+# themselves (`--publish never` in package.json): the Release workflow attaches the latest*.yml and
+# .blockmap files written next to the installers.
+publish:
+  provider: github
+  owner: SteveDeveloperConcepts
+  repo: Heard
 
 win:
   target:
