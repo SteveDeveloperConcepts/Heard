@@ -1,9 +1,9 @@
 name: Release
 
 # Builds the Windows and Mac installers on GitHub's machines and publishes them as a GitHub release.
-# Push a version tag to release (the tag must match package.json, e.g. v0.1.0):
-#   git tag v0.1.0
-#   git push origin v0.1.0
+# `npm run release <version> "<what changed>"` starts it: it raises the version and pushes a tag whose
+# message becomes the release's "What's new" (see "Publish a release" in README.md). Pushing a version
+# tag by hand works too. The tag must match package.json, e.g. v0.1.0.
 # Running it by hand from the Actions tab builds the installers without releasing them.
 on:
   push:
@@ -77,23 +77,31 @@ jobs:
     permissions:
       contents: write
     steps:
+      # For .github/release-notes.md and the tag's message.
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v8
         with:
           path: installers
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v3
-        with:
-          name: Heard ${{ github.ref_name }}
-          files: installers/*
-          fail_on_unmatched_files: true
-          generate_release_notes: true
-          body: |
-            ## Download
-
-            - **Windows 10 or 11:** `Heard-Setup-*.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
-            - **macOS 13 or later, Apple Silicon (M1 or newer):** `Heard-*-arm64.dmg`. Open it and drag Heard to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
-
-            On first launch, add an API key for your AI in Settings. Your first recording downloads the speech model (about 130 MB); after that, transcription works offline.
-
-            Once it's installed, Heard looks for new versions itself. On Windows it downloads them and installs them when you restart it. On a Mac it tells you when there's a new one to download.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          tag="refs/tags/$GITHUB_REF_NAME"
+          notes="$RUNNER_TEMP/notes.md"
+          : > "$notes"
+          # An annotated tag's message, after its first line, becomes "What's new". actions/checkout
+          # swaps an annotated tag for a plain one, so fetch the real tag to read its message.
+          git fetch --quiet --force origin "$tag:$tag"
+          if [ "$(git cat-file -t "$tag")" = tag ]; then
+            whats_new=$(git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME")
+            if [ -n "$(printf '%s' "$whats_new" | tr -d '[:space:]')" ]; then
+              printf "## What's new\n\n%s\n\n" "$whats_new" > "$notes"
+            fi
+          fi
+          sed "s/<version>/$version/g" .github/release-notes.md >> "$notes"
+          gh release create "$GITHUB_REF_NAME" installers/* --verify-tag \
+            --title "Heard $GITHUB_REF_NAME" --notes-file "$notes" --generate-notes

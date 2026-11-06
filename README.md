@@ -167,20 +167,33 @@ While recording, the **Me** and **Them** chips in the recording bar and at the t
 - `npm start` runs the bundled app without the dev server.
 - `npm run icons` regenerates the app icon in `build/`.
 - `npm run helper:mac` builds the Mac call-detection helper; it needs Xcode 15.1+ command line tools.
+- `npm run release <version> "<what changed>"` publishes a new version: see below.
 
 ### Publish a release
 
-GitHub builds both installers and publishes the release ([.github/workflows/release.yml](.github/workflows/release.yml)). Set the new version in `package.json`, commit and push it, then push a matching tag:
+`npm run release` publishes a new version, and installed copies then update to it by themselves. Commit the work you're releasing, then give it the new version and one quoted line for each change:
 
 ```bash
-git tag v0.1.0
+npm run release <new version> "<what changed>" "<what else changed>"
+```
+
+Replace each `<…>`, angle brackets included, with your own text. The version is three numbers, higher than the one in `package.json`. Each change is one short sentence written for the people who use Heard; the lines appear under **What's new** on the release page. Add `--dry-run` to see the plan and the release notes without changing anything.
+
+It raises the version in `package.json` and `package-lock.json`, commits that, tags the commit with your notes, and pushes the commit and tag together ([scripts/release.mjs](scripts/release.mjs)). Before it changes anything, it checks that you have no uncommitted changes, that nobody has pushed to the branch since you last pulled, and that the tag doesn't exist yet. If a check fails, it says what's wrong and changes nothing.
+
+The tag starts the **Release** workflow ([.github/workflows/release.yml](.github/workflows/release.yml)), which builds both installers on GitHub's machines and publishes them on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page about 3 minutes later. The release notes are your lines, the download instructions from [.github/release-notes.md](.github/release-notes.md), and a link to every change since the last release. To test the builds without releasing, run the workflow by hand from the Actions tab; its installers are attached to the run.
+
+**If the build fails**, nothing is published. Delete the tag on GitHub and on your computer, replacing `<version>` with the version you released:
+
+```bash
+git push origin :refs/tags/v<version>
 ```
 
 ```bash
-git push origin v0.1.0
+git tag -d v<version>
 ```
 
-About 10 minutes later, the Windows and Mac installers appear on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page. To test the builds without releasing, run the **Release** workflow by hand from the Actions tab; its installers are attached to the run.
+Then fix the problem, commit and push the fix, and run `npm run release` again with the same version and notes. `package.json` already has that version, so this time it only tags and pushes. A published release can't be replaced this way: to change its notes, open it on GitHub and click **Edit**.
 
 **How installed copies get the release.** Next to the installers, the release has `latest.yml` (Windows), `latest-mac.yml` and `.blockmap` files. Installed copies read them to find the new version, and Windows uses the `.blockmap` files to download only what changed. Don't delete them from a release. If you replace an installer on a release, for example with a signed one, replace its `latest*.yml` and `.blockmap` with the ones from the same build too. Installed copies check the download against them and refuse one that doesn't match.
 
