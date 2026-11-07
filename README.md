@@ -9,9 +9,11 @@ AI meeting notes for macOS and Windows. Hit record, jot quick notes, and Heard t
 Get the latest installer from [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases/latest):
 
 - **Windows 10 or 11:** `Heard-Setup-<version>.exe`. The installer isn't code-signed yet, so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**.
-- **macOS 13 or later on Apple Silicon (M1 or newer):** `Heard-<version>-arm64.dmg`. Open it and drag Heard to Applications. The app isn't notarized by Apple yet, so the first time you open it macOS says it can't verify it. Click **Done**, open **System Settings → Privacy & Security**, and click **Open Anyway**.
+- **macOS 13 or later on Apple Silicon (M1 or newer):** `Heard-<version>-arm64.dmg`. Open it and drag Heard to Applications. It's signed with a Developer ID and notarised by Apple, so it opens like any other app.
 
-Once installed, Heard looks for new versions itself. On Windows it downloads them in the background and installs them when you restart it: choose **Restart now** in the banner or **Restart to update** in the tray menu, or it installs the next time you quit Heard. It never restarts while you're recording. On a Mac it tells you when there's a new version, and **Download** opens its release page. Versions 0.1.3 and earlier don't check, so install the version after them by hand.
+Once installed, Heard looks for new versions itself. It downloads them in the background and installs them when you restart it: choose **Restart now** in the banner or **Restart to update** in the tray menu (the menu bar on a Mac), or it installs the next time you quit Heard. It never restarts while you're recording. Versions 0.1.3 and earlier don't check, so install the version after them by hand.
+
+**On a Mac with Heard 0.2.1 or earlier,** install the next version by hand once. Those versions aren't signed with a Developer ID, which macOS requires before an app can update itself, so they only say when a new version is out. Choose **Download**, then drag the new Heard to Applications to replace the old one. macOS asks for microphone and screen-audio permission once more, and from then on Heard updates itself.
 
 Then see [First launch](#first-launch). To run from the source code instead, read on.
 
@@ -72,11 +74,11 @@ This makes `dist\Heard-Setup-0.1.0.exe`. Run it and follow the steps; Heard then
 npm run dist:mac
 ```
 
-This also builds the call-detection helper, and makes `dist/Heard-0.1.0-arm64.dmg`. Open it and drag Heard to Applications. The app isn't signed by Apple. If macOS says it can't be opened, go to System Settings → Privacy & Security and click **Open Anyway**.
+This also builds the call-detection helper, and makes `dist/Heard-0.1.0-arm64.dmg`. Open it and drag Heard to Applications.
 
 The installed app uses the same data folder as `npm run dev`, so your meetings, settings and downloaded speech model carry over.
 
-The Mac app is only ad-hoc signed, so other people have to use **Open Anyway** too, and macOS asks for microphone and screen-audio permission again after each update. To avoid both, sign it with an Apple Developer ID certificate: remove `identity: '-'` and set `notarize: true` in [electron-builder.yml](electron-builder.yml).
+This Mac build has only an ad-hoc signature ([electron-builder.adhoc.yml](electron-builder.adhoc.yml)): signing with the Developer ID happens in the Release workflow. It opens on the Mac that built it, but it can't install updates, macOS asks for microphone and screen-audio permission again for each new build, and another Mac only opens it after **Open Anyway** in System Settings → Privacy & Security. Releases have none of these limits.
 
 ### If something goes wrong
 
@@ -169,6 +171,34 @@ While recording, the **Me** and **Them** chips in the recording bar and at the t
 - `npm run helper:mac` builds the Mac call-detection helper; it needs Xcode 15.1+ command line tools.
 - `npm run release <version> "<what changed>"` publishes a new version: see below.
 
+### One-time setup for releases
+
+Mac updates only install if the app is signed with a Developer ID and notarised by Apple, so the Release workflow refuses to publish without these. A release that shipped unsigned could never update itself.
+
+**1. Get the certificate.** On your Mac, in Xcode, go to **Settings → Accounts → Manage Certificates** and add a **Developer ID Application** certificate, if you do not have one. Then open **Keychain Access**, find it under **My Certificates**, right-click it, and choose **Export**. Save it as a `.p12` file with a password.
+
+Turn the file into text and copy it:
+
+```bash
+base64 -i certificate.p12 | pbcopy
+```
+
+**2. Make an app-specific password.** At [account.apple.com](https://account.apple.com), open **Sign-In and Security**, then **App-Specific Passwords**. Apple uses this to notarise builds.
+
+**3. Add five repository secrets.** On GitHub, open this repository's **Settings → Secrets and variables → Actions** and add:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_CERTIFICATE` | The text from step 1 |
+| `MAC_CERTIFICATE_PASSWORD` | The `.p12` password |
+| `APPLE_ID` | The email address of your Apple Developer account |
+| `APPLE_APP_SPECIFIC_PASSWORD` | The password from step 2 |
+| `APPLE_TEAM_ID` | Your Team ID, under Membership details on developer.apple.com |
+
+Delete the `.p12` file afterwards.
+
+The Release workflow checks for all five before it builds the Mac app, and stops with an error naming any that are missing. To try the setup without publishing anything, run the workflow by hand from the Actions tab: it builds, signs and notarises the installers, and attaches them to the run.
+
 ### Publish a release
 
 `npm run release` publishes a new version, and installed copies then update to it by themselves. Commit the work you're releasing, then give it the new version and one quoted line for each change:
@@ -181,7 +211,7 @@ Replace each `<…>`, angle brackets included, with your own text. The version i
 
 It raises the version in `package.json` and `package-lock.json`, commits that, tags the commit with your notes, and pushes the commit and tag together ([scripts/release.mjs](scripts/release.mjs)). Before it changes anything, it checks that you have no uncommitted changes, that nobody has pushed to the branch since you last pulled, and that the tag doesn't exist yet. If a check fails, it says what's wrong and changes nothing.
 
-The tag starts the **Release** workflow ([.github/workflows/release.yml](.github/workflows/release.yml)), which builds both installers on GitHub's machines and publishes them on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page about 3 minutes later. The release notes are your lines, the download instructions from [.github/release-notes.md](.github/release-notes.md), and a link to every change since the last release. To test the builds without releasing, run the workflow by hand from the Actions tab; its installers are attached to the run.
+The tag starts the **Release** workflow ([.github/workflows/release.yml](.github/workflows/release.yml)), which builds both installers on GitHub's machines, signs the Mac app and has Apple notarise it, and publishes them on the [Releases](https://github.com/SteveDeveloperConcepts/Heard/releases) page. That usually takes a few minutes; notarising can make it longer. The release notes are your lines, the download instructions from [.github/release-notes.md](.github/release-notes.md), and a link to every change since the last release. To test the builds without releasing, run the workflow by hand from the Actions tab; its installers are attached to the run.
 
 **If the build fails**, nothing is published. Delete the tag on GitHub and on your computer, replacing `<version>` with the version you released:
 
@@ -195,17 +225,11 @@ git tag -d v<version>
 
 Then fix the problem, commit and push the fix, and run `npm run release` again with the same version and notes. `package.json` already has that version, so this time it only tags and pushes. A published release can't be replaced this way: to change its notes, open it on GitHub and click **Edit**.
 
-**How installed copies get the release.** Next to the installers, the release has `latest.yml` (Windows), `latest-mac.yml` and `.blockmap` files. Installed copies read them to find the new version, and Windows uses the `.blockmap` files to download only what changed. Don't delete them from a release. If you replace an installer on a release, for example with a signed one, replace its `latest*.yml` and `.blockmap` with the ones from the same build too. Installed copies check the download against them and refuse one that doesn't match.
+**How installed copies get the release.** Next to the installers, the release has `latest.yml` (Windows), `latest-mac.yml`, the Mac `.zip` and `.blockmap` files. Installed copies read the `latest*.yml` files to find the new version. Windows installs it from the installer and a Mac from the `.zip`, and both use the `.blockmap` files to download only what changed. Don't delete them from a release. If you replace an installer on a release, for example with a signed one, replace its `latest*.yml` and `.blockmap` with the ones from the same build too. Installed copies check the download against them and refuse one that doesn't match.
 
 Every published release reaches everyone within a few hours, and you can't take it back from copies that have already updated. If a release is broken, publish a fixed one with a higher version.
 
-**Full updates on macOS.** Mac copies only announce new versions, because macOS only installs updates signed with an Apple Developer ID. Once you have a certificate:
-
-1. Sign and notarise the Mac build: remove `identity: '-'` and set `notarize: true` in [electron-builder.yml](electron-builder.yml), and give the Release workflow the certificate.
-2. Add a `zip` target (arm64) to `mac.target`. Mac updates install from the zip, not the DMG. Add `dist/*.zip` to the files the workflow uploads.
-3. In `updateMode` in [src/main/updater.ts](src/main/updater.ts), return `'install'` for `darwin` too.
-
-Copies with the ad-hoc signature can't install a signed update, so Mac users install the first signed version by hand. The notice tells them it's out.
+**Macs on 0.2.1 or earlier.** Those copies have only an ad-hoc signature, and macOS won't let them install a signed update, so they only announce new versions. Their users install the first signed version by hand, as [Download](#download) and the release notes explain; from then on, Mac copies update themselves. A Mac copy that can't install a version, for example because it's running from the disk image or the Downloads folder, offers its release page instead.
 
 ## Permissions
 
@@ -222,4 +246,4 @@ The screens follow the design canvas at https://claude.ai/artifact/73Y38mAGeuAWi
 - Built-in transcription on macOS needs an Apple Silicon Mac: ONNX Runtime 1.30 ships no Intel-Mac build. On Intel Macs, use Deepgram.
 - Built-in transcription labels everyone on the call "Them". Separating several remote voices (Speaker 1, 2, …) works only with Deepgram.
 - No calendar integration. Browser calls are recognised by window title, so only Google Meet (and, in a Windows browser, Teams, Zoom and Webex) are detected, and only when their tab is showing at some point during the call.
-- The macOS call-detection helper hasn't been compiled or run yet (it was written on Windows).
+- The Release workflow builds the macOS call-detection helper and checks that it starts, but it was written on Windows and hasn't been tested during a real call.

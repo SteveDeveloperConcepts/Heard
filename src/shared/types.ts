@@ -225,9 +225,9 @@ export interface PermissionStatus {
 }
 
 /**
- * A newer Heard on GitHub. `ready`: downloaded, and installed when Heard restarts or quits (Windows).
- * `available`: the user downloads it from its release page (macOS, until the app is signed with a
- * Developer ID).
+ * A newer Heard on GitHub. `ready`: downloaded, and installed when Heard restarts or quits.
+ * `available`: the user downloads it from its release page, because this Mac copy can't install it
+ * (one built without the Developer ID, or running from the disk image or the Downloads folder).
  */
 export interface UpdateState {
   kind: 'ready' | 'available'

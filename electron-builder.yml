@@ -10,7 +10,7 @@ directories:
 # Keep every rule here: a `files` list under win: or mac: would replace this one, not add to it.
 files:
   - '!{src,scripts,native}/**'
-  - '!{README.md,electron.vite.config.ts,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{README.md,electron.vite.config.ts,electron-builder.adhoc.yml,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # Transformers.js has its own copy of the browser speech engine and never loads this package.
   - '!**/node_modules/onnxruntime-web/**'
   # Only the speech engine for the platform and processor being built (each is built on its own OS).
@@ -48,16 +48,25 @@ nsis:
 mac:
   category: public.app-category.productivity
   # Apple Silicon only: ONNX Runtime, which runs the built-in transcription, has no Intel Mac build.
+  # The disk image is what people download. Updates install from the zip.
   target:
     - target: dmg
       arch: arm64
-  # Ad-hoc signature, so a downloaded copy can be opened with "Open Anyway" instead of being
-  # reported as damaged. Remove this line once you sign with an Apple Developer ID certificate.
-  identity: '-'
+    - target: zip
+      arch: arm64
+  artifactName: Heard-${version}-${arch}.${ext}
+  # Signed with a Developer ID and notarised by the Release workflow ("One-time setup for releases"
+  # in README.md). electron-builder notarises when APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and
+  # APPLE_TEAM_ID are set. `npm run dist:mac` builds without the certificate (electron-builder.adhoc.yml).
   hardenedRuntime: true
+  # Gatekeeper only accepts the app once it's notarised, which comes after signing. The Release
+  # workflow checks it then.
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # Signs the app as electron-builder would, except that the call-detection helper gets
+  # build/entitlements.call-monitor.plist instead of Electron's entitlements.
+  sign: ./scripts/sign-mac.mjs
   # Call-detection helper, built by `npm run helper:mac`.
   extraResources:
     - from: build/mac/call-monitor
@@ -66,6 +75,3 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: Heard transcribes your side of a meeting, only while you are recording.
     NSAudioCaptureUsageDescription: Heard transcribes the other participants' audio, only while you are recording.
-  notarize: false
-dmg:
-  artifactName: Heard-${version}-${arch}.${ext}

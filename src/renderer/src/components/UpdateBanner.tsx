@@ -8,7 +8,7 @@ interface Props {
   onInstall(): void
 }
 
-/** A newer Heard: ready to install on restart (Windows), or to download from its release page (Mac). */
+/** A newer Heard: ready to install on restart, or, when a Mac can't install it, to download by hand. */
 export function UpdateBanner({ update, recording, onLater, onInstall }: Props) {
   const ready = update.kind === 'ready'
   return (

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!--
+      The call-detection helper (native/mac/call-monitor.swift) needs no entitlements under the
+      hardened runtime. It reads Core Audio's record of which apps are using audio input, and the list
+      of running apps, which no permission covers. It never opens the microphone, generates code at
+      run time, or loads libraries other than Apple's. scripts/sign-mac.mjs signs it with this file.
+    -->
+  </dict>
+</plist>

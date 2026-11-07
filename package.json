@@ -18,7 +18,7 @@
     "icons": "node scripts/make-icons.mjs",
     "helper:mac": "node scripts/build-mac-helper.mjs",
     "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:mac": "npm run build && npm run helper:mac && electron-builder --mac --publish never",
+    "dist:mac": "npm run build && npm run helper:mac && electron-builder --mac --publish never -c electron-builder.adhoc.yml",
     "release": "node scripts/release.mjs"
   },
   "dependencies": {

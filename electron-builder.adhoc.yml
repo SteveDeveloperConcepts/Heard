@@ -1,0 +1,10 @@
+# Mac builds made without the Developer ID certificate, for trying a build on your own Mac:
+# `npm run dist:mac`. Apple Silicon Macs won't open an app with no signature at all, so it gets an
+# ad-hoc one. Such a build can't install updates, and macOS asks for microphone and screen-audio
+# permission again for each new one. It keeps the hardened runtime and the entitlements of a release,
+# so the microphone and the call-detection helper behave as they will once signed.
+# The Release workflow never uses this: a release has to be signed, or it could not update itself.
+extends: electron-builder.yml
+mac:
+  identity: '-'
+  notarize: false

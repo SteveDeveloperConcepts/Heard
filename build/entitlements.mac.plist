@@ -7,7 +7,9 @@
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
-    <!-- Lets an ad-hoc signed app load its native modules (speech recognition, image tools). -->
+    <!-- Lets the app load its native modules (speech recognition, image tools) when it has only an
+         ad-hoc signature, as `npm run dist:mac` builds it. A release signs them with its own
+         Developer ID, so they'd load without this, but it keeps both builds alike. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
     <!-- Microphone access under the hardened runtime. -->

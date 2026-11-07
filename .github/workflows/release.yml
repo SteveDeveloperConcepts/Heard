@@ -1,10 +1,12 @@
 name: Release
 
-# Builds the Windows and Mac installers on GitHub's machines and publishes them as a GitHub release.
-# `npm run release <version> "<what changed>"` starts it: it raises the version and pushes a tag whose
-# message becomes the release's "What's new" (see "Publish a release" in README.md). Pushing a version
-# tag by hand works too. The tag must match package.json, e.g. v0.1.0.
-# Running it by hand from the Actions tab builds the installers without releasing them.
+# Builds the Windows and Mac installers on GitHub's machines, signs and notarises the Mac app, and
+# publishes them as a GitHub release. `npm run release <version> "<what changed>"` starts it: it raises
+# the version and pushes a tag whose message becomes the release's "What's new" (see "Publish a
+# release" in README.md). Pushing a version tag by hand works too. The tag must match package.json,
+# e.g. v0.1.0.
+# Running it by hand from the Actions tab builds, signs and notarises the installers without
+# releasing them.
 on:
   push:
     tags: ['v*']
@@ -23,12 +25,8 @@ jobs:
         include:
           - name: Windows
             os: windows-latest
-            script: dist:win
-            installer: dist/Heard-Setup-*.exe
           - name: macOS
             os: macos-latest # Apple Silicon, with Xcode for the call-detection helper
-            script: dist:mac
-            installer: dist/Heard-*.dmg
     steps:
       - uses: actions/checkout@v7
 
@@ -49,22 +47,120 @@ jobs:
 
       - run: npm ci
 
-      # The dist scripts pass `--publish never`, so this only builds; the release job publishes.
-      - name: Build the installer
-        run: npm run ${{ matrix.script }}
+      # The builds pass `--publish never`, so they only build; the release job publishes.
+      - name: Build the Windows installer
+        if: runner.os == 'Windows'
+        run: npm run dist:win
 
-      # Installed copies read latest.yml (Windows) or latest-mac.yml to find a new version, and the
-      # Windows updater uses the .blockmap files to download only what changed. Without them, nobody
-      # gets this release as an update.
+      # A Mac build without the Developer ID certificate could never update itself, so it must not be
+      # released. electron-builder signs with the certificate in CSC_LINK, and notarises when the three
+      # APPLE_ variables are set. See "One-time setup for releases" in README.md.
+      - name: Build, sign, and notarise the Mac app
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=0
+          for pair in MAC_CERTIFICATE=CSC_LINK MAC_CERTIFICATE_PASSWORD=CSC_KEY_PASSWORD APPLE_ID=APPLE_ID \
+            APPLE_APP_SPECIFIC_PASSWORD=APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID=APPLE_TEAM_ID; do
+            secret=${pair%%=*}
+            variable=${pair#*=}
+            if [ -z "${!variable}" ]; then
+              echo "::error::The repository secret $secret is missing, so the Mac app can't be signed and notarised. See \"One-time setup for releases\" in README.md."
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+          npm run build
+          npm run helper:mac
+          npx electron-builder --mac --publish never
+
+      # Every app must pass Gatekeeper with its notarisation ticket stapled: the one built, and the
+      # copies in the zip (updates) and the disk image (downloads). The call-detection helper must be
+      # signed on its own, with no entitlements (scripts/sign-mac.mjs), and start.
+      - name: Check the Mac app is signed, notarised, and complete
+        if: runner.os == 'macOS'
+        run: |
+          check_app() {
+            echo "Checking $1"
+            codesign --verify --deep --strict --verbose=2 "$1"
+            spctl --assess --type execute --verbose=2 "$1"
+            xcrun stapler validate "$1"
+          }
+          shopt -s nullglob
+          apps=(dist/mac*/Heard.app)
+          zips=(dist/Heard-*.zip)
+          dmgs=(dist/Heard-*.dmg)
+          if [ ${#apps[@]} = 0 ] || [ ${#zips[@]} = 0 ] || [ ${#dmgs[@]} = 0 ]; then
+            echo "::error::The Mac build is missing its app, zip, or disk image in dist/."
+            exit 1
+          fi
+
+          for app in "${apps[@]}"; do
+            check_app "$app"
+            helper="$app/Contents/Resources/call-monitor"
+            if [ ! -x "$helper" ]; then
+              echo "::error::$app has no call-detection helper. npm run helper:mac builds it."
+              exit 1
+            fi
+            codesign --verify --strict --verbose=2 "$helper"
+            codesign --display --verbose=2 "$helper"
+            entitlements=$(codesign --display --entitlements - --xml "$helper" 2>/dev/null || true)
+            echo "Entitlements: ${entitlements:-none}"
+            if [[ $entitlements == *'<key>'* ]]; then
+              echo "::error::The call-detection helper in $app was signed with entitlements it doesn't need. See scripts/sign-mac.mjs."
+              exit 1
+            fi
+            # Under the hardened runtime, as it ships, it prints its first report straight away.
+            "$helper" > "$RUNNER_TEMP/call-monitor.txt" &
+            sleep 3
+            kill "$!" 2>/dev/null || true
+            if ! grep -q '"mode"' "$RUNNER_TEMP/call-monitor.txt"; then
+              echo "::error::The call-detection helper in $app didn't start."
+              exit 1
+            fi
+          done
+
+          for zip in "${zips[@]}"; do
+            dir=$(mktemp -d)
+            ditto -x -k "$zip" "$dir"
+            check_app "$dir/Heard.app"
+          done
+
+          for dmg in "${dmgs[@]}"; do
+            dir=$(mktemp -d)
+            hdiutil attach -nobrowse -readonly -mountpoint "$dir" "$dmg"
+            check_app "$dir/Heard.app"
+            hdiutil detach "$dir" || hdiutil detach -force "$dir"
+          done
+
+      # Installed copies read latest.yml (Windows) or latest-mac.yml to find a new version. Windows
+      # installs from the installer and a Mac from the zip, and both use the .blockmap files to download
+      # only what changed. Without these, nobody gets this release as an update.
       - name: Check the update files were written
         shell: bash
-        run: ls dist/latest*.yml dist/*.blockmap
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            ls dist/latest-mac.yml dist/Heard-*.zip dist/*.blockmap
+            if ! grep -q '^ *- url: Heard-.*\.zip$' dist/latest-mac.yml; then
+              echo "::error::latest-mac.yml doesn't list the zip, so Macs couldn't install this release."
+              exit 1
+            fi
+          else
+            ls dist/latest.yml dist/*.blockmap
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
           name: Heard-${{ matrix.name }}
           path: |
-            ${{ matrix.installer }}
+            dist/Heard-Setup-*.exe
+            dist/Heard-*.dmg
+            dist/Heard-*.zip
             dist/*.blockmap
             dist/latest*.yml
           if-no-files-found: error

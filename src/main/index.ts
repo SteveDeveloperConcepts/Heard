@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Notification, shell, type Tray } from 'electron'
+import { app, autoUpdater, BrowserWindow, Notification, shell, type Tray } from 'electron'
 import { join } from 'node:path'
 import { setupCallDetection, stopCallDetection } from './calls'
 import { flushMeetings } from './meetings'
@@ -127,6 +127,11 @@ if (!app.requestSingleInstanceLock()) {
       } else {
         notify(`Heard ${state.version} is available`, 'Choose Download from the Heard icon in the menu bar.')
       }
+    })
+    // Restarting to update closes the windows before before-quit on a Mac. Let them close instead of
+    // hiding in the tray, or the restart would never happen.
+    autoUpdater.on('before-quit-for-update', () => {
+      quitting = true
     })
     updater.start()
     app.on('activate', showWindow)
