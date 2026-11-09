@@ -4,7 +4,7 @@ export interface AiProviderInfo {
   label: string
   shortLabel: string
   blurb: string
-  /** OpenAI-compatible endpoint. Anthropic has none: it is called through its own SDK. */
+  /** OpenAI-compatible endpoint. Anthropic (its own SDK) and Claude Code (a program) have none. */
   baseUrl?: string
   baseUrlEditable: boolean
   keyRequired: boolean
@@ -15,7 +15,7 @@ export interface AiProviderInfo {
   note?: string
 }
 
-export const AI_PROVIDER_IDS: readonly AiProviderId[] = ['anthropic', 'openai', 'gemini', 'openrouter', 'ollama', 'custom']
+export const AI_PROVIDER_IDS: readonly AiProviderId[] = ['anthropic', 'claude-code', 'openai', 'gemini', 'openrouter', 'ollama', 'custom']
 
 export const AI_PROVIDERS: Record<AiProviderId, AiProviderInfo> = {
   anthropic: {
@@ -28,6 +28,17 @@ export const AI_PROVIDERS: Record<AiProviderId, AiProviderInfo> = {
     keyUrl: 'https://console.anthropic.com/settings/keys',
     defaultModel: 'claude-opus-5-5',
     suggestedModels: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']
+  },
+  'claude-code': {
+    label: 'Claude Code (your Claude plan)',
+    shortLabel: 'Claude Code',
+    blurb: 'Your Claude plan, no key',
+    baseUrlEditable: false,
+    keyRequired: false,
+    defaultModel: 'default',
+    suggestedModels: ['default', 'opus', 'sonnet', 'haiku'],
+    note:
+      'Writes notes with Claude Code on this computer, signed in with your Claude subscription, so they count toward your plan\'s usage limits instead of being billed per use. Install Claude Code and run claude in a terminal once to sign in, then use Check below. The "default" model lets Claude Code choose.'
   },
   openai: {
     label: 'OpenAI',
@@ -94,8 +105,19 @@ export function aiSetupProblem(s: Settings): string | null {
   const info = AI_PROVIDERS[s.aiProvider]
   if (info.keyRequired && s.aiKeys[s.aiProvider] === 'none') return `Add a ${info.label} API key to get summaries and notes.`
   if (!s.aiModels[s.aiProvider]) return `Choose a ${info.label} model to get summaries and notes.`
-  if (s.aiProvider !== 'anthropic' && !s.aiBaseUrls[s.aiProvider]) return `Set the ${info.label} API base URL to get summaries and notes.`
+  if (usesBaseUrl(s.aiProvider) && !s.aiBaseUrls[s.aiProvider]) return `Set the ${info.label} API base URL to get summaries and notes.`
   return null
+}
+
+/** Whether the provider is reached at an OpenAI-compatible URL: everything but Claude and Claude Code. */
+export function usesBaseUrl(id: AiProviderId): boolean {
+  return AI_PROVIDERS[id].baseUrl !== undefined
+}
+
+/** How notes credit the model that wrote them. Claude Code's "default" is its own choice of model. */
+export function modelLabel(provider: AiProviderId, model: string): string {
+  if (provider !== 'claude-code') return model
+  return model === 'default' ? 'Claude Code' : `Claude Code (${model})`
 }
 
 export function isAiProviderId(value: unknown): value is AiProviderId {

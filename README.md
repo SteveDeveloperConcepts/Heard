@@ -51,7 +51,7 @@ The window opens after a few seconds, and code changes reload automatically. Clo
 
 ### First launch
 
-1. **Pick your AI.** In Settings → AI for notes and questions, choose a provider and paste its API key (Claude is the default). Choose Ollama to run without a key. Recording and transcripts work without an AI; only the summary, Enhance and Ask need one.
+1. **Pick your AI.** In Settings → AI for notes and questions, choose a provider and paste its API key (Claude is the default). Choose Claude Code to use your Claude subscription instead of a key, or Ollama to run without one. Recording and transcripts work without an AI; only the summary, Enhance and Ask need one.
 2. **Record.** Click **Start recording**. The first time, Heard downloads the speech model (about 130 MB) and shows progress in the recording bar. To download it in advance, use Settings → Transcription → **Download now**.
 3. **Allow access.** Allow microphone access when asked. On a Mac, also allow **Screen & System Audio Recording**, so the other side of a call is captured (see [Permissions](#permissions)).
 4. **Gmail (optional).** If you're signed in to several Google accounts, pick the one to send from in Settings → Sharing.
@@ -86,6 +86,7 @@ This Mac build has only an ad-hoc signature ([electron-builder.adhoc.yml](electr
 - **Errors that mention the Node.js version:** install the current Node.js LTS from https://nodejs.org, then run `npm install` again.
 - **The speech model won't download:** the first recording needs internet access to huggingface.co. Once you're online, use Settings → Transcription → **Download now**.
 - **No "Them" lines during a call:** check that system audio capture is on in Settings → Audio. On a Mac, also allow Screen & System Audio Recording, then restart Heard.
+- **"Claude Code isn't signed in":** run `claude` in a terminal and sign in with your Claude account, then press **Check** in Settings → AI.
 
 ## How it works
 
@@ -140,13 +141,18 @@ Pick the provider and model in **Settings → AI for notes and questions**. **Lo
 | Provider | What you need |
 |---|---|
 | Claude (Anthropic), the default | API key, or `ANTHROPIC_API_KEY`. Default model `claude-opus-5-5`. |
+| Claude Code (your Claude plan) | No key: [Claude Code](https://code.claude.com/docs/en/setup) installed and signed in with your Claude account. Notes count toward your plan's usage limits instead of being billed per use. **Check** makes sure it's ready. |
 | OpenAI | API key, or `OPENAI_API_KEY` |
 | Google Gemini | API key, or `GEMINI_API_KEY` |
 | OpenRouter | One key for models from many providers, or `OPENROUTER_API_KEY` |
 | Ollama | Nothing: runs locally, and notes never leave your computer. Default URL `http://localhost:11434/v1` |
 | Other OpenAI-compatible API | Base URL plus an optional key: LM Studio, Groq, Mistral, DeepSeek, vLLM, … |
 
-Claude goes through the official `@anthropic-ai/sdk`, with prompt caching on the meeting context and server-side refusal fallback ([src/main/ai/anthropic.ts](src/main/ai/anthropic.ts)). Every other provider uses the OpenAI Chat Completions streaming format ([src/main/ai/openai-compatible.ts](src/main/ai/openai-compatible.ts)). To add a provider with a different API, implement `AiClient` in [src/main/ai/types.ts](src/main/ai/types.ts) and add it to `clientFor` in [src/main/ai/index.ts](src/main/ai/index.ts).
+Claude goes through the official `@anthropic-ai/sdk`, with prompt caching on the meeting context and server-side refusal fallback ([src/main/ai/anthropic.ts](src/main/ai/anthropic.ts)).
+
+Claude Code runs the `claude` program you installed, in print mode (`claude -p`), with Heard's instructions in place of its own and no tools, MCP servers or user settings, so your hooks and plugins don't run for meeting notes. The meeting and the conversation go in with those instructions, and Claude Code's own prompt is a fixed sentence with its file mentions turned off, so nothing said in a meeting can make it read a file from your computer ([src/main/ai/claude-code.ts](src/main/ai/claude-code.ts)). Heard never sees your Claude sign-in, and leaves `ANTHROPIC_API_KEY` out of Claude Code's environment so the plan is used rather than an API key. A Claude subscription can't be used through the API itself: Anthropic's terms only allow it in Claude's own apps, Claude Code included. If you give Heard to other people, read [Anthropic's conditions for products that run Claude Code](https://code.claude.com/docs/en/legal-and-compliance) first.
+
+Every other provider uses the OpenAI Chat Completions streaming format ([src/main/ai/openai-compatible.ts](src/main/ai/openai-compatible.ts)). To add a provider with a different API, implement `AiClient` in [src/main/ai/types.ts](src/main/ai/types.ts) and add it to `clientFor` in [src/main/ai/index.ts](src/main/ai/index.ts).
 
 ## Transcription
 

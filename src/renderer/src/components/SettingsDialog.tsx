@@ -424,13 +424,18 @@ export function SettingsDialog({ settings, engineStatus, onSaved, onClose }: Pro
                         </select>
                       )}
                       <button type="button" className="btn small" disabled={loadingModels} onClick={() => void loadModels()}>
-                        {loadingModels ? 'Loading…' : 'Load list'}
+                        {/* Claude Code has no model list to load: the button checks it's installed and signed in. */}
+                        {provider === 'claude-code' ? (loadingModels ? 'Checking…' : 'Check') : loadingModels ? 'Loading…' : 'Load list'}
                       </button>
                     </div>
                     {models.length > 0 && typeModel && modelIdInput}
                     {modelError && <span className="hint error">{modelError}</span>}
                     {modelOptions[provider] && !modelError && (
-                      <span className="hint">{modelOptions[provider]!.length} models available.</span>
+                      <span className="hint">
+                        {provider === 'claude-code'
+                          ? 'Claude Code is installed and signed in to your Claude plan.'
+                          : `${modelOptions[provider]!.length} models available.`}
+                      </span>
                     )}
                   </div>
                 </div>

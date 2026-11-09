@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { AI_PROVIDERS } from '../../shared/providers'
+import { AI_PROVIDERS, modelLabel, usesBaseUrl } from '../../shared/providers'
 import type { AiEvent, AiProgress, AiTask, ChatMessage, Meeting, ModelListRequest } from '../../shared/types'
 import { appendChat, getMeeting, pendingSummaries, setSummaryPending, updateMeeting } from '../meetings'
 import { recorder } from '../recorder'
 import { aiConfig, loadSettings, type AiConfig } from '../settings'
 import { anthropicClient } from './anthropic'
+import { claudeCodeClient } from './claude-code'
 import { openAiCompatibleClient } from './openai-compatible'
 import { ASK_SYSTEM, ENHANCE_SYSTEM, TITLE_INSTRUCTION, cleanTitle, enhanceInstruction, meetingContext } from './prompts'
 import type { AiClient, ChatRequest } from './types'
@@ -28,7 +29,9 @@ interface EnhanceRun extends AiProgress {
 const enhancing = new Map<string, EnhanceRun>()
 
 function clientFor(config: AiConfig): AiClient {
-  return config.provider === 'anthropic' ? anthropicClient(config) : openAiCompatibleClient(config)
+  if (config.provider === 'anthropic') return anthropicClient(config)
+  if (config.provider === 'claude-code') return claudeCodeClient(config)
+  return openAiCompatibleClient(config)
 }
 
 /** The configured provider, checked up front so setup problems surface before anything starts. */
@@ -40,7 +43,7 @@ function activeClient(): AiClient {
   if (info.keyRequired && !config.apiKey && config.provider !== 'anthropic') {
     throw new Error(`Add your ${info.label} API key in Settings.`)
   }
-  if (config.provider !== 'anthropic' && !config.baseUrl) throw new Error('Set the API base URL in Settings.')
+  if (usesBaseUrl(config.provider) && !config.baseUrl) throw new Error('Set the API base URL in Settings.')
   return clientFor(config)
 }
 
@@ -164,7 +167,7 @@ function startEnhance(meeting: Meeting, client: AiClient, emit: Emit, { auto, wh
   if (previous) cancelAi(previous.requestId)
   titling.get(meetingId)?.abort() // these notes will name the meeting instead
 
-  const { model } = aiConfig()
+  const { provider, model } = aiConfig()
   const context = meetingContext(meeting)
   const instruction = enhanceInstruction(meeting.template)
   const segmentCount = meeting.transcript.length
@@ -188,7 +191,12 @@ function startEnhance(meeting: Meeting, client: AiClient, emit: Emit, { auto, wh
           name(text)
           throw new Error('You edited the notes while the summary was being written, so your version was kept.')
         }
-        await updateMeeting(meetingId, { enhancedNotes: text, enhancedBy: model, enhancedEdited: false, enhancedSegmentCount: segmentCount })
+        await updateMeeting(meetingId, {
+          enhancedNotes: text,
+          enhancedBy: modelLabel(provider, model),
+          enhancedEdited: false,
+          enhancedSegmentCount: segmentCount
+        })
         name(text)
       },
       onSettled: () => {
@@ -216,7 +224,7 @@ export async function enhanceNotes(meetingId: string, emit: Emit): Promise<strin
 export function aiReady(): boolean {
   const config = aiConfig()
   const info = AI_PROVIDERS[config.provider]
-  return Boolean(config.model && (!info.keyRequired || config.apiKey) && (config.provider === 'anthropic' || config.baseUrl))
+  return Boolean(config.model && (!info.keyRequired || config.apiKey) && (!usesBaseUrl(config.provider) || config.baseUrl))
 }
 
 function speechChars(text: string): number {

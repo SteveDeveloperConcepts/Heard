@@ -70,8 +70,11 @@ export type MeetingPatch = Partial<
 
 export type MacAudioBackend = 'screencapturekit' | 'coreaudio-tap'
 
-/** Which service writes notes and answers questions. Everything but Anthropic speaks the OpenAI chat API. */
-export type AiProviderId = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'ollama' | 'custom'
+/**
+ * Which service writes notes and answers questions. Everything but Anthropic and Claude Code (the user's
+ * Claude plan, through the Claude Code program) speaks the OpenAI chat API.
+ */
+export type AiProviderId = 'anthropic' | 'claude-code' | 'openai' | 'gemini' | 'openrouter' | 'ollama' | 'custom'
 
 export type KeyStatus = 'stored' | 'environment' | 'none'
 
