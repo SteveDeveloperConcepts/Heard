@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
@@ -13,7 +13,7 @@ import type { AiClient, ChatRequest } from './types'
 // Flags and output format: https://code.claude.com/docs/en/cli-reference and .../headless
 
 const SETUP_URL = 'https://code.claude.com/docs/en/setup'
-const NOT_INSTALLED = `Claude Code isn't installed on this computer. Install it (${SETUP_URL}), then run claude in a terminal once to sign in.`
+const NOT_FOUND = `Heard couldn't find Claude Code on this computer. Install it (${SETUP_URL}), then run claude in a terminal once to sign in.`
 const NOT_SIGNED_IN = "Claude Code isn't signed in. Run claude in a terminal and sign in with your Claude account."
 const NOT_A_PLAN =
   'Claude Code is signed in with an API key or a cloud provider, so it would bill that rather than your Claude plan. To use your plan, run claude in a terminal, type /login and choose your Claude account.'
@@ -33,8 +33,38 @@ function isFile(path: string): boolean {
 }
 
 /**
+ * The folder of each Node version that nvm keeps under `root`, newest first. Every version has its own
+ * global packages, so a claude installed with npm under one drops off the PATH when another is in use.
+ */
+function nodeVersionDirs(root: string): string[] {
+  try {
+    return readdirSync(root)
+      .filter((name) => /^v\d+\.\d+\.\d+$/.test(name))
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+      .map((name) => join(root, name))
+  } catch {
+    return []
+  }
+}
+
+/** Where nvm for Windows keeps its Node versions: beside itself, unless `nvm root` moved them. */
+function nvmWindowsRoots(): string[] {
+  const { NVM_HOME, APPDATA } = process.env
+  const nvmHome = NVM_HOME || (APPDATA ? join(APPDATA, 'nvm') : '')
+  if (!nvmHome) return []
+  let moved = ''
+  try {
+    moved = /^root:[ \t]*(.+?)[ \t]*$/m.exec(readFileSync(join(nvmHome, 'settings.txt'), 'utf8'))?.[1] ?? ''
+  } catch {
+    // No settings file: the versions are beside nvm.
+  }
+  return moved && moved !== nvmHome ? [moved, nvmHome] : [nvmHome]
+}
+
+/**
  * Where `claude` is: first on the PATH, so it's the one a terminal runs (an older install may linger
- * elsewhere), then where its installers put it, since an app opened from the Dock may not get that PATH.
+ * elsewhere), then where its installers put it, since an app opened from the Dock may not get that PATH,
+ * then under every Node version nvm has, whichever one is in use: `nvm use` takes the others off the PATH.
  */
 function findClaude(): string | null {
   const home = homedir()
@@ -42,22 +72,25 @@ function findClaude(): string | null {
     .split(delimiter)
     .map((dir) => dir.trim().replace(/^"(.*)"$/, '$1'))
     .filter(Boolean)
-  const { LOCALAPPDATA, APPDATA } = process.env
+  const { LOCALAPPDATA, APPDATA, NVM_DIR } = process.env
+  // In each folder the program itself before npm's .cmd wrapper, which only cmd.exe can run.
+  const inWindowsDir = (dir: string) => [join(dir, 'claude.exe'), join(dir, 'claude.cmd')]
   const candidates =
     process.platform === 'win32'
       ? [
-          // In each folder the program itself before npm's .cmd wrapper, which only cmd.exe can run.
-          ...dirs.flatMap((dir) => [join(dir, 'claude.exe'), join(dir, 'claude.cmd')]),
+          ...dirs.flatMap(inWindowsDir),
           join(home, '.local', 'bin', 'claude.exe'),
           ...(LOCALAPPDATA ? [join(LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'claude.exe')] : []),
-          ...(APPDATA ? [join(APPDATA, 'npm', 'claude.cmd')] : [])
+          ...(APPDATA ? [join(APPDATA, 'npm', 'claude.cmd')] : []),
+          ...nvmWindowsRoots().flatMap(nodeVersionDirs).flatMap(inWindowsDir)
         ]
       : [
           ...dirs.map((dir) => join(dir, 'claude')),
           join(home, '.local', 'bin', 'claude'),
           join(home, '.claude', 'local', 'claude'),
           '/opt/homebrew/bin/claude',
-          '/usr/local/bin/claude'
+          '/usr/local/bin/claude',
+          ...nodeVersionDirs(join(NVM_DIR || join(home, '.nvm'), 'versions', 'node')).map((dir) => join(dir, 'bin', 'claude'))
         ]
   return candidates.find(isFile) ?? null
 }
@@ -111,7 +144,7 @@ interface RunOptions {
 /** Runs `claude` with these arguments, passing each line it prints to `onLine`. */
 function runClaude(args: string[], options: RunOptions): Promise<{ code: number | null; stderr: string }> {
   const exe = findClaude()
-  if (!exe) return Promise.reject(new Error(NOT_INSTALLED))
+  if (!exe) return Promise.reject(new Error(NOT_FOUND))
   return new Promise((resolve, reject) => {
     const child = launch(exe, args, options.cwd)
     let stdout = ''
@@ -155,7 +188,7 @@ function runClaude(args: string[], options: RunOptions): Promise<{ code: number 
     })
     child.on('error', (err) => {
       const missing = (err as NodeJS.ErrnoException).code === 'ENOENT'
-      settle(() => reject(new Error(missing ? NOT_INSTALLED : `Could not start Claude Code: ${err.message}`)))
+      settle(() => reject(new Error(missing ? NOT_FOUND :`Could not start Claude Code: ${err.message}`)))
     })
     child.on('close', (code) => {
       readLines(true)
